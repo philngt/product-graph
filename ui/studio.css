@@ -1,0 +1,25 @@
+/* Scope, lens and selection are separate: expose what is hidden, not a fake health score. */
+[hidden] { display: none !important; }
+button:disabled { cursor: not-allowed; opacity: .45; transform: none; }
+.scope-status { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .6rem 1.2rem; border-bottom: 1px solid var(--line); }
+.scope-status p { color: var(--muted); font-size: .72rem; line-height: 1.5; }
+.scope-actions { display: flex; flex-shrink: 0; gap: .4rem; }
+.scope-actions .button { min-height: 30px; padding: .35rem .6rem; font-size: .68rem; }
+.visibility-notice { padding: .65rem 1.2rem; border-bottom: 1px solid var(--line); background: rgba(230, 184, 106, .09); color: #e6b86a; font-size: .75rem; line-height: 1.5; }
+.layer-label strong, .layer-label small { display: block; }
+.layer-label small { margin-top: .25rem; font-size: .66rem; color: var(--muted); line-height: 1.4; }
+.graph-canvas { min-height: 260px; }
+#graph-svg { min-height: 260px; }
+.canvas-toolbar { flex-wrap: wrap; }
+.toolbar-actions { flex-wrap: wrap; }
+.lens-list { justify-content: flex-start; max-width: none; }
+.workspace-drawer { min-height: 0; }
+.drawer-tabs { flex-wrap: wrap; align-items: center; padding-bottom: .4rem; }
+#drawer-toggle { color: var(--ink); border: 1px solid var(--line); border-radius: 6px; }
+.toast.show { opacity: 1; transform: translateY(0); }
+.accent-intent { stroke: #f4bc7a; }
+.accent-product { stroke: #75e0c2; }
+.accent-business { stroke: #ef9bca; }
+.accent-experience { stroke: #90d7bb; }
+.accent-decision { stroke: #ff8d8d; }
+.accent-quality { stroke: #b8c8ff; }

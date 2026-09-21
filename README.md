@@ -58,3 +58,18 @@ POST /api/proposals/:id/reject
 POST /api/compare
 POST /api/commands
 ```
+
+## Focused authoring
+
+Select an object to inspect it without changing focus. Use **Focus here** to work on its neighborhood, **Isolate** to show that object alone, and **All models** to widen the scope while keeping the current lens. Back/Forward restore focus, lens, selection and search together; they do not undo product edits.
+
+Scope counters and selection notices explain what a lens or search hides. Hidden objects remain in the canonical graph, and Save always writes the whole working model. Supporting tools stay in a collapsible drawer. Unapplied inspector drafts are preserved across lens changes, and agent proposals cannot overwrite unsaved local edits.
+
+Read the [Semantic Model Studio interaction contract](docs/semantic-model-studio.md) for invariants, acceptance checks and known limits.
+
+```sh
+npm run test:studio
+PRODUCT_GRAPH_BROWSER=/path/to/chromium npm run test:studio:browser
+```
+
+The browser smoke test uses the real UI with in-memory API fixtures; it is not a server/persistence integration test. The existing CLI/MCP tests remain part of `npm test`.
