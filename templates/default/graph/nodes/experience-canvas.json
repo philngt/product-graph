@@ -1,0 +1,7 @@
+{
+  "id": "experience:graph-canvas",
+  "type": "screen",
+  "region": "experience",
+  "title": "Graph canvas",
+  "data": {"emptyState": "Start with a product intent."}
+}

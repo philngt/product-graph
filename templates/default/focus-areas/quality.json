@@ -1,0 +1,8 @@
+{
+  "id": "focus:quality",
+  "title": "Verification",
+  "description": "Review decisions and quality signals connected to the product graph.",
+  "rootIds": ["quality:graph-valid"],
+  "defaultView": "architecture",
+  "depth": 2
+}

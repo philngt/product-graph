@@ -1,0 +1,7 @@
+{
+  "id": "decision:files-source",
+  "type": "decision",
+  "region": "decision",
+  "title": "Files remain portable source",
+  "data": {"why": "Git compatibility and human readability."}
+}

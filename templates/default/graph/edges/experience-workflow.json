@@ -1,0 +1,6 @@
+{
+  "id": "edge:experience-workflow",
+  "kind": "supports",
+  "from": "experience:graph-canvas",
+  "to": "workflow:develop"
+}

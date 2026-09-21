@@ -1,0 +1,7 @@
+{
+  "id": "document:readme",
+  "type": "document",
+  "region": "experience",
+  "title": "Project overview",
+  "document": "documents/overview.md"
+}

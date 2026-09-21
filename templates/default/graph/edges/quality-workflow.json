@@ -1,0 +1,6 @@
+{
+  "id": "edge:quality-workflow",
+  "kind": "verifies",
+  "from": "quality:graph-valid",
+  "to": "workflow:develop"
+}

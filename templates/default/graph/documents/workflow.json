@@ -1,0 +1,7 @@
+{
+  "id": "document:workflow",
+  "title": "Workflow guide",
+  "path": "documents/workflow.md",
+  "purpose": "Describe the project workflow.",
+  "links": ["workflow:develop"]
+}

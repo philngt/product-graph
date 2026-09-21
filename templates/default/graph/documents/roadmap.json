@@ -1,0 +1,7 @@
+{
+  "id": "document:roadmap",
+  "title": "Roadmap guide",
+  "path": "documents/roadmap.md",
+  "purpose": "Describe implementation milestones.",
+  "links": ["roadmap:foundation"]
+}

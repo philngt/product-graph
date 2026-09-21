@@ -1,0 +1,6 @@
+{
+  "id": "edge:workflow-project",
+  "kind": "operates-on",
+  "from": "workflow:develop",
+  "to": "product:graph-workspace"
+}

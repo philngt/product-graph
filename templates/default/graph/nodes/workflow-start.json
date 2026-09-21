@@ -1,0 +1,8 @@
+{
+  "id": "workflow:develop",
+  "type": "workflow",
+  "region": "workflow",
+  "title": "Develop a project slice",
+  "status": "active",
+  "data": {"steps": ["shape", "implement", "verify"]}
+}

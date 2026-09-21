@@ -1,0 +1,9 @@
+{
+  "id": "tour:graph-workspace",
+  "title": "Explore the graph workspace",
+  "steps": [
+    {"scopeId": "focus:rotation", "nodeId": "intent:problem", "lens": "product", "explanation": "Start with the intent and problem the workspace is solving."},
+    {"scopeId": "focus:rotation", "nodeId": "workflow:develop", "lens": "workflow", "explanation": "See how the team moves from a product idea to a verified slice."},
+    {"scopeId": "focus:rotation", "nodeId": "architecture:framework", "lens": "architecture", "explanation": "Inspect the implementation boundary without losing product context."}
+  ]
+}

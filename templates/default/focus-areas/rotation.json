@@ -1,0 +1,8 @@
+{
+  "id": "focus:rotation",
+  "title": "Graph workspace",
+  "description": "Understand the product model across intent, workflow, experience and architecture.",
+  "rootIds": ["product:graph-workspace"],
+  "defaultView": "product",
+  "depth": 2
+}

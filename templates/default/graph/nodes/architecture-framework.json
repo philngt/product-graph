@@ -1,0 +1,7 @@
+{
+  "id": "architecture:framework",
+  "type": "component",
+  "region": "architecture",
+  "title": "Graph project framework",
+  "data": {"responsibility": "Load, validate and project canonical graph data."}
+}

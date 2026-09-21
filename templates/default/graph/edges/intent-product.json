@@ -1,0 +1,6 @@
+{
+  "id": "edge:intent-product",
+  "kind": "enables",
+  "from": "intent:problem",
+  "to": "product:graph-workspace"
+}

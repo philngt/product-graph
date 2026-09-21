@@ -1,0 +1,6 @@
+{
+  "id": "edge:business-product",
+  "kind": "entitles",
+  "from": "business:free-plan",
+  "to": "product:graph-workspace"
+}

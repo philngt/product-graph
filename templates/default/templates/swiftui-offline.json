@@ -1,0 +1,7 @@
+{
+  "id": "template:ios-swiftui-offline",
+  "title": "Offline-first SwiftUI application",
+  "target": "ios-swiftui",
+  "version": "0.1.0",
+  "supports": ["product", "workflow", "domain", "experience", "architecture", "quality"]
+}

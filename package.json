@@ -1,0 +1,22 @@
+{
+  "name": "graph-project-framework",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reusable graph-centric project development framework",
+  "bin": {
+    "framework": "src/cli.ts"
+  },
+  "scripts": {
+    "framework": "node --experimental-strip-types src/cli.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "check": "node --experimental-strip-types src/cli.ts check ."
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.6.5"
+  }
+}

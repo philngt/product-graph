@@ -1,0 +1,7 @@
+{
+  "id": "domain:project",
+  "type": "concept",
+  "region": "domain",
+  "title": "Project",
+  "data": {"definition": "A bounded body of work with an intended outcome."}
+}

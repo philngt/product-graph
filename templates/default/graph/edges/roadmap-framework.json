@@ -1,0 +1,6 @@
+{
+  "id": "edge:roadmap-framework",
+  "kind": "delivers",
+  "from": "roadmap:foundation",
+  "to": "architecture:framework"
+}

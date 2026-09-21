@@ -1,0 +1,7 @@
+{
+  "id": "business:free-plan",
+  "type": "plan",
+  "region": "business",
+  "title": "Free plan",
+  "data": {"entitlement": "core graph workspace"}
+}

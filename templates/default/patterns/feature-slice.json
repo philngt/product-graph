@@ -1,0 +1,7 @@
+{
+  "id": "pattern:feature-slice",
+  "title": "Feature slice",
+  "problem": "A feature needs a coherent path from intent to verification.",
+  "structure": ["intent", "product", "workflow", "domain", "experience", "architecture", "quality"],
+  "tradeoffs": "More explicit modeling up front, less context reconstruction later."
+}

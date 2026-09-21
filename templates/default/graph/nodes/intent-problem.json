@@ -1,0 +1,7 @@
+{
+  "id": "intent:problem",
+  "type": "problem",
+  "region": "intent",
+  "title": "Product intent",
+  "data": {"definition": "Make the product model understandable before implementation begins."}
+}

@@ -1,0 +1,7 @@
+{
+  "id": "document:architecture",
+  "title": "Architecture guide",
+  "path": "documents/architecture.md",
+  "purpose": "Describe the project architecture.",
+  "links": ["architecture:framework"]
+}

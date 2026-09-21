@@ -1,0 +1,7 @@
+{
+  "id": "document:readme",
+  "title": "Project overview",
+  "path": "documents/overview.md",
+  "purpose": "Explain the project intent and current graph entry points.",
+  "links": ["intent:problem", "product:graph-workspace", "architecture:framework"]
+}

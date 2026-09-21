@@ -1,0 +1,6 @@
+{
+  "id": "edge:framework-workflow",
+  "kind": "implements",
+  "from": "architecture:framework",
+  "to": "experience:graph-canvas"
+}

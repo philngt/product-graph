@@ -1,0 +1,7 @@
+{
+  "id": "document:domain",
+  "title": "Domain guide",
+  "path": "documents/domain.md",
+  "purpose": "Describe the project domain.",
+  "links": ["domain:project"]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "product:graph-workspace",
+  "type": "feature",
+  "region": "product",
+  "title": "Graph workspace",
+  "status": "defined"
+}

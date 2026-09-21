@@ -1,0 +1,7 @@
+{
+  "id": "quality:graph-valid",
+  "type": "acceptance-criterion",
+  "region": "quality",
+  "title": "Graph references are valid",
+  "status": "planned"
+}

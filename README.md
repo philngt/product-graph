@@ -1,0 +1,60 @@
+# Product Graph
+
+Graph-native workspace for modelling product intent, business rules, workflows, domain, experience and architecture from one canonical product graph.
+
+## Requirements
+
+- Node.js 22+
+
+## Quick start
+
+```sh
+npm run framework -- init ./my-project
+npm run framework -- validate ./my-project
+npm run framework -- project ./my-project
+npm run framework -- context ./my-project
+npm run framework -- check ./my-project
+npm run framework -- serve ./my-project 4173
+npm run framework -- mcp ./my-project
+```
+
+The canonical input is JSON manifests under `graph/` plus Markdown under `documents/`. Generated artifacts are written as both JSON and Markdown under `projections/`, with the agent bundle under `agent-context/`. Node semantics use typed regions such as `intent`, `product`, `business`, `workflow`, `domain`, `experience`, `architecture`, `decision` and `quality`.
+
+JSON remains the canonical product model. Markdown in `agent-context/` is generated, scoped context for agents; it is not a second source of truth. The IDE writes graph commands to JSON, validates the result and regenerates the Markdown context.
+
+`framework mcp` starts a stdio MCP server. Agents can search the graph, request scoped Markdown context, validate, compare and create reviewable proposals. MCP cannot apply a proposal directly: a human reviews it in Product Graph Studio under `Agent proposals`, then applies or rejects it.
+
+Useful context commands:
+
+```sh
+npm run framework -- context ./my-project --scope=focus:rotation
+npm run framework -- context ./my-project --root=product:graph-workspace --depth=3
+```
+
+Generated context contains stable node IDs, typed relationships, source paths and graph revision. Pending agent proposals live under `agent-context/proposals/` and are separate from canonical `graph/` files.
+
+## Model
+
+The graph has typed nodes, typed edges and document records. Workflow, domain, architecture, document and roadmap are projections over the same graph. Agent context is a filtered, provenance-preserving bundle for a task or agent.
+
+The initial implementation is deliberately stack-agnostic. Integrations should implement the `ProjectAdapter` contract in `src/types.ts` and keep project-specific behavior outside the core graph engine.
+
+`framework serve` opens Product Graph Studio: a browser interface for navigating semantic views, visualizing relationships, focusing a bounded subgraph, dragging/pinning layout, editing nodes, adding relationships, undoing/redoing changes and saving changes back to the canonical graph.
+
+The current workspace exposes six primary projections: Product, Business, Workflow, Domain, Experience and Architecture. Intent, Decision and Quality are available as semantic regions through the inspector and validation surface.
+
+The studio is focus-first. Focus areas live under `focus-areas/`; selecting one keeps the product context while lenses change the representation. The inspector exposes `Why this exists`, `Where used`, `Impact`, source documents and linked decisions. The lower workspace drawer provides context, baseline/current comparison, patterns/templates and guided tours.
+
+Workspace APIs include:
+
+```text
+GET  /api/workspace
+GET  /api/context?rootId=<node>&depth=2
+GET  /api/agent-context?rootId=<node>&depth=3
+GET  /api/proposals
+POST /api/proposals/:id/preview
+POST /api/proposals/:id/apply
+POST /api/proposals/:id/reject
+POST /api/compare
+POST /api/commands
+```

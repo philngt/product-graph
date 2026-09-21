@@ -1,0 +1,6 @@
+{
+  "id": "edge:decision-architecture",
+  "kind": "constrains",
+  "from": "decision:files-source",
+  "to": "architecture:framework"
+}
