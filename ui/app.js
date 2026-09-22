@@ -5,6 +5,7 @@ import { createStudioPages } from "./studio-pages.js";
 import { createProjectClient } from "./project-client.js";
 import { initProjectSession } from "./project-session.js";
 import { initDocumentBrowser } from "./document-browser.js";
+import { initVisualAuthoring } from "./visual-authoring.js";
 
 const VIEWS = ["overview", "product", "business", "workflow", "domain", "experience", "architecture", "verification", "decisions", "impact"];
 const labels = { overview: "Overview", product: "Product", business: "Business", workflow: "Workflow", domain: "Domain", experience: "Experience", architecture: "Architecture", verification: "Verification", decisions: "Decisions", impact: "Related impact" };
@@ -284,15 +285,17 @@ async function renderDrawerOriginal(content, generation) {
   if (state.drawer === "library") { const cards = [...state.library.patterns.map((item) => ({ ...item, kind: "Pattern" })), ...state.library.templates.map((item) => ({ ...item, kind: "Template" }))]; content.innerHTML = cards.length ? cards.map((item) => `<div class="drawer-card"><strong>${escapeHtml(item.kind)} · ${escapeHtml(item.title)}</strong>${escapeHtml(item.problem || item.target || "Reusable knowledge for the current scope.")}<br><button type="button" data-library="${escapeHtml(item.id)}">Preview in scope</button></div>`).join("") : `<span class="muted">Library is empty.</span>`; document.querySelectorAll("[data-library]").forEach((button) => button.addEventListener("click", () => pages.openItem([...state.library.patterns.map((item, index) => ({ id: item.id, key: `pattern-${index}` })), ...state.library.templates.map((item, index) => ({ id: item.id, key: `template-${index}` }))].find(item => item.id === button.dataset.library)?.key, button))); return; }
   const tour = state.tour?.tour || state.tours[0]; if (!tour) { content.innerHTML = `<span class="muted">No guided tours configured.</span>`; return; } if (!state.tour) content.innerHTML = `<div class="drawer-card"><strong>${escapeHtml(tour.title)}</strong>${tour.steps.length} semantic steps<br><button id="start-tour" type="button">Start tour</button></div>`; else content.innerHTML = `<div class="drawer-card"><strong>${escapeHtml(tour.title)}</strong>Step ${state.tour.index + 1} of ${tour.steps.length}<br>${escapeHtml(tour.steps[state.tour.index].explanation)}<br><button id="tour-back" type="button" ${state.tour.index === 0 ? "disabled" : ""}>Back</button> <button id="tour-next" type="button">${state.tour.index === tour.steps.length - 1 ? "Finish" : "Next"}</button></div>`; $("start-tour")?.addEventListener("click", () => startTour(tour)); $("tour-back")?.addEventListener("click", () => { state.tour.index -= 1; showTourStep(); }); $("tour-next")?.addEventListener("click", () => { if (state.tour.index >= state.tour.tour.steps.length - 1) { state.tour = null; render(); toast("Tour complete"); } else { state.tour.index += 1; showTourStep(); } });
 }
-async function previewProposal(id) { try { const result = await request(`/api/proposals/${encodeURIComponent(id)}/preview`, { method: "POST" }); const target = $(`proposal-detail-${id}`); if (target) target.innerHTML = `<p><strong>Preview</strong> ${result.diff.nodesAdded.length} added · ${result.diff.nodesChanged.length} changed · ${result.diff.edgesAdded.length} relationships</p><p>${result.canApply ? "Ready for human approval." : "Cannot apply: stale or invalid."}</p>${result.diagnostics.length ? `<p class="muted">${result.diagnostics.map((item) => escapeHtml(item.message)).join("<br>")}</p>` : ""}`; } catch (error) { toast(error.message); } }
-async function applyProposal(id) {
+const proposalReviews = new Map();
+async function previewProposal(id) { try { const result = await request(`/api/proposals/${encodeURIComponent(id)}/preview`, { method: "POST" }); proposalReviews.set(id, result.proposalRevision); const target = $(`proposal-detail-${id}`); if (target) target.innerHTML = `<p><strong>Preview</strong> ${result.diff.nodesAdded.length} added · ${result.diff.nodesChanged.length} changed · ${result.diff.edgesAdded.length} relationships</p><p>${result.canApply ? "Ready for human approval." : "Cannot apply: stale or invalid."}</p><details><summary>Exact proposed commands and rationale</summary><pre>${escapeHtml(JSON.stringify(result.proposal, null, 2))}</pre></details>${result.diagnostics.length ? `<p class="muted">${result.diagnostics.map((item) => escapeHtml(item.message)).join("<br>")}</p>` : ""}`; } catch (error) { toast(error.message); } }
+async function applyProposal(id, reviewedRevision = proposalReviews.get(id)) {
   if (state.busy) return;
   if (state.dirty || state.formDirty) return toast("Apply object edits and save your model before applying a proposal.");
-  if (!confirm("Apply this agent proposal to the canonical graph?")) return;
+  if (!reviewedRevision) { await previewProposal(id); toast("Review the preview, then choose Apply again."); return; }
+  if (!confirm("Apply this proposal to the canonical graph? This does not authorize execution.")) return;
   state.busy = true;
   render();
   try {
-    const result = await request(`/api/proposals/${encodeURIComponent(id)}/apply`, { method: "POST" });
+    const result = await request(`/api/proposals/${encodeURIComponent(id)}/apply`, { method: "POST", headers: { "X-Product-Graph-Proposal-Revision": reviewedRevision } });
     state.graph = result.graph;
     state.baseline = clone(result.graph);
     state.diagnostics = result.diagnostics || [];
@@ -504,6 +507,23 @@ const pages = createStudioPages({
 });
 initAppearance();
 initDocumentBrowser({ request, graph: () => state.graph, isDirty: () => state.dirty, selection: () => state.selectedId, inspect: selectNode });
+initVisualAuthoring({
+  request,
+  graph: () => state.graph,
+  scope: () => state.scope,
+  dirty: () => state.dirty || state.formDirty,
+  busy: () => state.busy || Boolean(state.dragging),
+  onProposal: proposal => {
+    state.proposals = [...state.proposals.filter(item => item.id !== proposal.id), proposal];
+    render();
+  },
+  apply: async (id, reviewedRevision) => {
+    await applyProposal(id, reviewedRevision);
+    return state.proposals.some(item => item.id === id && item.status === "applied");
+  },
+  inspect: selectNode,
+  review: () => openDrawer("proposals"),
+});
 initProjectSession({
   projectId: projectClient.projectId,
   dirty: () => state.dirty || state.formDirty,
