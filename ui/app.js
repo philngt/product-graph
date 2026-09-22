@@ -6,6 +6,8 @@ import { createProjectClient } from "./project-client.js";
 import { initProjectSession } from "./project-session.js";
 import { initDocumentBrowser } from "./document-browser.js";
 import { initVisualAuthoring } from "./visual-authoring.js";
+import { initQuickEdit } from "./quick-edit.js";
+import { nextObjectPosition } from "./quick-edit-model.js";
 
 const VIEWS = ["overview", "product", "business", "workflow", "domain", "experience", "architecture", "verification", "decisions", "impact"];
 const labels = { overview: "Overview", product: "Product", business: "Business", workflow: "Workflow", domain: "Domain", experience: "Experience", architecture: "Architecture", verification: "Verification", decisions: "Decisions", impact: "Related impact" };
@@ -13,6 +15,7 @@ const regions = ["intent", "product", "business", "workflow", "domain", "experie
 const colors = { intent: "#f4bc7a", product: "#75e0c2", business: "#ef9bca", workflow: "#e6b86a", domain: "#81c8ff", experience: "#90d7bb", architecture: "#bd9aff", decision: "#ff8d8d", quality: "#b8c8ff" };
 const state = { graph: null, baseline: null, diagnostics: [], focusAreas: [], tours: [], library: { patterns: [], templates: [] }, proposals: [], scope: projectScope(), view: "overview", search: "", selectedId: null, context: null, compare: null, drawer: "context", dirty: false, history: [], future: [], layout: {}, scopeBack: [], scopeForward: [], tour: null, dragging: null, drawerOpen: false, busy: false, formId: null, formDirty: false, contextRequest: 0, contextError: "", drawerRequest: 0 };
 const $ = (id) => document.getElementById(id);
+let quickEdit = null;
 
 const projectClient = createProjectClient(location.pathname);
 const request = projectClient.request;
@@ -147,6 +150,7 @@ function renderGraph() {
   });
   $("auto-layout").disabled = state.busy || !nodes.length || Boolean(state.dragging);
   $("unpin-selection").disabled = state.busy || !state.layout[scopeKey()]?.positions?.[state.selectedId]?.pinned || Boolean(state.dragging);
+  quickEdit?.decorate(svg, positions);
 }
 function startDrag(event, id) {
   if (event.button !== 0 || state.busy) return;
@@ -354,6 +358,7 @@ function render() {
   setStatus(state.dirty ? "Unsaved changes" : "Ready");
   renderAgentDrawer();
   pages.render();
+  quickEdit?.refresh();
 }
 
 function renderScopeStatus() {
@@ -464,38 +469,32 @@ $("delete-node").addEventListener("click", () => {
     state.selectedId = null;
   });
 });
-$("add-node").addEventListener("click", () => {
-  if (state.busy || !discardDraft()) return;
-  const root = state.scope.rootIds.map(nodeById).find(Boolean);
-  if (state.scope.id !== "project" && !root) return toast("Choose an existing focus object or open All models first.");
-  pages.show("model");
-  const title = prompt("Object title", "New product concept")?.trim();
-  if (!title) return;
-  const region = regions.includes(state.view) ? state.view : state.view === "verification" ? "quality" : state.view === "decisions" ? "decision" : "product";
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || crypto.randomUUID();
-  const node = { id: `${region}:${slug}`, type: region === "domain" ? "concept" : region, region, title, status: "draft", data: {} };
-  if (nodeById(node.id)) return toast("An object with this ID already exists");
-  // The user chooses the relationship; never invent an edge just to make a node visible.
-  const kind = root ? prompt(`Relationship from ${root.title} to ${title}`, "relates-to")?.trim() : null;
-  if (root && !kind) return;
-  commit(() => {
-    state.graph.nodes.push(node);
-    if (root) state.graph.edges.push({ id: `edge:${crypto.randomUUID()}`, kind, from: root.id, to: node.id });
-    state.selectedId = node.id;
-  });
-  if (root && state.scope.depth === 0) navigateUI({ scope: { ...state.scope, depth: 1 }, search: "" });
-  else { state.search = ""; $("search").value = ""; render(); }
-});
-$("add-edge").addEventListener("click", () => {
-  const node = selectedNode();
-  if (!node || state.busy || !discardDraft()) return;
-  const target = prompt("Target object ID", state.graph.nodes.find((item) => item.id !== node.id)?.id || "");
-  if (target === null) return;
-  if (!nodeById(target)) return toast("Target object was not found");
-  const kind = prompt("Relationship kind", "relates-to")?.trim();
-  if (!kind) return;
-  commit(() => state.graph.edges.push({ id: `edge:${crypto.randomUUID()}`, kind, from: node.id, to: target }));
-});
+// All entry points share the same explicit forms; no title/ID prompt chains.
+$("add-node").addEventListener("click", () => quickEdit?.create());
+$("add-edge").addEventListener("click", () => quickEdit?.connect());
+
+function applyQuickPlan(plan, options) {
+  if (state.busy || state.dragging || state.formDirty) return false;
+  if (plan.graph === state.graph) return true; // An unchanged rename is not an edit.
+  let nextScope = state.scope;
+  const reveal = options.action === "create" && options.reveal;
+  if (reveal && state.scope.id !== "project") {
+    let depth = state.scope.depth;
+    while (depth < 8 && !neighborhood(plan.graph, state.scope.rootIds, depth).has(plan.selectedId)) depth++;
+    nextScope = { ...state.scope, depth };
+  }
+  const key = `${nextScope.id}:${reveal ? "overview" : state.view}`;
+  const position = plan.node ? nextObjectPosition({ ...displayedPositions, ...state.layout[key]?.positions }, options.point, options.anchorId) : null;
+  if (!commit(() => {
+    state.graph = plan.graph;
+    state.selectedId = plan.selectedId;
+    if (position) state.layout[key] = { schemaVersion: "1.0.0", ...state.layout[key], positions: { ...state.layout[key]?.positions, [plan.selectedId]: position } };
+  })) return false;
+  if (reveal) navigateUI({ scope: nextScope, view: "overview", search: "" });
+  const hidden = projectView(state.graph, state).selectionVisibility !== "visible";
+  toast(options.action === "create" ? `Created draft object${hidden ? "; inspect it here or use Focus here to reveal it" : ""}. Save to persist.` : options.action === "connect" ? "Relationship created. Focus unchanged; Save to persist." : "Name updated; identity and relationships preserved.");
+  return true;
+}
 
 const pages = createStudioPages({
   state,
@@ -505,6 +504,8 @@ const pages = createStudioPages({
   model: allModels,
   review: () => openDrawer("compare"),
 });
+quickEdit = initQuickEdit({ state, apply: applyQuickPlan, showModel: () => pages.show("model"), save: saveWorkspace,
+  fit: () => { if (state.graph) { cameras.delete(scopeKey()); renderGraph(); } }, toast });
 initAppearance();
 initDocumentBrowser({ request, graph: () => state.graph, isDirty: () => state.dirty, selection: () => state.selectedId, inspect: selectNode });
 initVisualAuthoring({

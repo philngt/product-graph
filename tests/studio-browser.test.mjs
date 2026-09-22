@@ -77,7 +77,9 @@ async function browserChecks() {
     const saved=await(await fetch('/__qa')).json();
     check(saved.savedNodes===6&&saved.savedTitle==='Recommend draft','Save writes the whole edited graph, not just the visible projection');
     check(q('#save-state').textContent==='Ready','Successful save clears dirty state');
-    const answers=['Exception path','contains']; window.prompt=()=>answers.shift()??null; click('#add-node');
+    window.prompt=()=>{throw new Error('Object authoring must not use a raw prompt');}; click('#add-node');
+    click('[name=quick-choice][value=step]'); input('#quick-title','Exception path'); input('#quick-kind','contains');
+    q('#quick-object-form').requestSubmit();
     check(q('#node-title').value==='Exception path'&&nodes()>=2,'Add to focus connects the new object and reveals it');
     click('#undo-button'); check(![...document.querySelectorAll('.node-title')].some(el=>el.textContent==='Exception path'),'Undo removes the added object and relationship together');
     click('#redo-button'); check([...document.querySelectorAll('.node-title')].some(el=>el.textContent==='Exception path'),'Redo restores the creation');

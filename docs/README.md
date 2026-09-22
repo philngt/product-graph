@@ -38,6 +38,7 @@ Suggested first read: thesis → brief → architecture → user flows. Before i
 | Document | Owns the details of |
 | --- | --- |
 | [Semantic Model Studio](semantic-model-studio.md) | Focus, lens, selection, visibility and navigation/edit-history separation. |
+| [draw.io-inspired usability](drawio-usability.md) | Direct Add/Connect/Rename flows, explicit semantics, scoped keyboard controls and current test boundaries. |
 | [Multi-project workspace](multi-project-workspace.md) | Catalog, routes, saved-source documents, project switching and local-file boundaries. |
 | [Visual authoring](visual-authoring.md) | Sketch storage, explicit definitions, exact proposal review and product task context. |
 | [Implementation targets](implementation-targets.md) | Target configuration, pins, bindings, mapping findings and target-specific context. |

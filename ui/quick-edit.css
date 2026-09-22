@@ -1,0 +1,42 @@
+.quick-edit-toolbar { display:flex; justify-content:space-between; flex-wrap:wrap; align-items:center; gap:8px; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--paper); }
+.quick-edit-toolbar > div { display:flex; flex-wrap:wrap; gap:6px; }
+.quick-edit-toolbar .button { padding:6px 9px; min-height:32px; font-size:11px; }
+.quick-edit-dialog { width:min(760px,94vw); max-width:94vw; max-height:90vh; overflow:auto; background:var(--paper); color:var(--ink); border:1px solid var(--frame); border-radius:8px; padding:24px; box-shadow:0 20px 70px #0003; }
+.quick-edit-dialog::backdrop { background:#17120c88; }
+.quick-edit-dialog header { display:flex; justify-content:space-between; gap:20px; margin-bottom:20px; }
+.quick-edit-dialog h2 { font:28px/1.2 var(--display); margin:7px 0 10px; }
+.quick-edit-dialog p { font-size:12px; line-height:1.7; color:var(--muted); }
+.quick-edit-dialog label:not(.quick-check) { display:grid; gap:6px; font-size:12px; margin:14px 0; }
+.quick-edit-dialog input:not([type=radio]):not([type=checkbox]), .quick-edit-dialog select, .quick-edit-dialog textarea { width:100%; min-width:0; padding:10px; background:var(--node); color:var(--ink); border:1px solid var(--line); border-radius:4px; font:inherit; }
+.quick-edit-dialog input:focus-visible, .quick-edit-dialog select:focus-visible, .quick-edit-dialog textarea:focus-visible, .quick-edit-dialog button:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.quick-edit-dialog .quick-object-choices { border:0; padding:0; margin:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.quick-object-choices legend { font-size:12px; margin-bottom:10px; color:var(--muted); }
+.quick-edit-dialog .quick-object-choices label { display:flex; align-items:flex-start; gap:8px; padding:12px 10px; margin:0; border:1px solid var(--line); border-radius:5px; cursor:pointer; }
+.quick-object-choices label:has(input:checked) { border-color:var(--accent); background:var(--accent-wash); }
+.quick-object-choices strong { display:block; font:17px var(--display); }
+.quick-object-choices small { display:block; font-size:10px; line-height:1.5; color:var(--muted); margin-top:6px; }
+.quick-object-choices input { margin:3px 0 0; }
+.quick-relationship-box { margin:16px 0; padding:16px; background:var(--surface); border:1px solid var(--line); border-radius:5px; }
+.quick-edit-dialog .quick-edge-preview { color:var(--accent); font:15px/1.6 var(--display); border-top:1px dashed var(--line); padding-top:10px; margin-top:12px; overflow-wrap:anywhere; }
+.quick-check { display:flex; align-items:flex-start; gap:9px; font-size:11px; line-height:1.6; color:var(--muted); margin:18px 0; }
+.quick-check input { margin:3px 0 0; }
+.quick-edit-dialog footer { display:flex; gap:10px; justify-content:flex-end; align-items:center; border-top:1px solid var(--line); padding-top:15px; margin-top:14px; }
+.quick-edit-dialog footer span { font-size:10px; color:var(--muted); margin-right:auto; }
+.quick-edit-dialog .quick-edit-error { color:var(--danger); min-height:1em; }
+.quick-edit-dialog details { margin-top:14px; }
+.quick-help p { margin:12px 0; }
+.quick-help kbd { font:12px ui-monospace,monospace; padding:3px 5px; border:1px solid var(--line); border-radius:3px; color:var(--ink); }
+.quick-related-handle { cursor:pointer; }
+.quick-related-handle circle { fill:var(--paper); stroke:var(--accent); stroke-width:1.5; }
+.quick-related-handle text { fill:var(--accent); font:18px sans-serif; pointer-events:none; }
+.quick-related-handle:hover circle, .quick-related-handle:focus-visible circle { fill:var(--accent-wash); stroke-width:3; }
+#quick-empty { justify-self:center; margin-top:18px; }
+@media(max-width:650px) { .quick-edit-dialog { padding:18px; }.quick-edit-dialog .quick-object-choices { grid-template-columns:repeat(2,minmax(0,1fr)); }.quick-edit-dialog footer { flex-wrap:wrap; }.quick-edit-dialog footer span { width:100%; } }
+/* Explicit control sizing avoids inheriting full-width form styles from the host. */
+.quick-edit-dialog header { align-items:flex-start; }
+.quick-edit-dialog .quick-object-choices input[type=radio] { display:inline-block; width:14px; height:14px; flex:0 0 14px; }
+.quick-edit-dialog .quick-check input[type=checkbox] { display:inline-block; width:14px; height:14px; flex:0 0 14px; }
+.quick-edit-dialog footer { position:sticky; bottom:-24px; background:var(--paper); padding:14px 0; }
+/* Extra authoring controls must not clip lower actions in shorter desktop windows. */
+.canvas-panel:has(.quick-edit-toolbar) { overflow-y:auto; }
+.quick-edit-toolbar { flex-shrink:0; }
