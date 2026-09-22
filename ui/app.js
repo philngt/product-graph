@@ -2,6 +2,9 @@ import { navigate, neighborhood, projectScope, projectView, regionOf, travel } f
 import { arrangeGraph, graphBounds, connectorGeometry, zoomCamera, CARD } from "./canvas-layout.js";
 import { initAppearance, navigateChoices } from "./studio-controls.js";
 import { createStudioPages } from "./studio-pages.js";
+import { createProjectClient } from "./project-client.js";
+import { initProjectSession } from "./project-session.js";
+import { initDocumentBrowser } from "./document-browser.js";
 
 const VIEWS = ["overview", "product", "business", "workflow", "domain", "experience", "architecture", "verification", "decisions", "impact"];
 const labels = { overview: "Overview", product: "Product", business: "Business", workflow: "Workflow", domain: "Domain", experience: "Experience", architecture: "Architecture", verification: "Verification", decisions: "Decisions", impact: "Related impact" };
@@ -10,7 +13,8 @@ const colors = { intent: "#f4bc7a", product: "#75e0c2", business: "#ef9bca", wor
 const state = { graph: null, baseline: null, diagnostics: [], focusAreas: [], tours: [], library: { patterns: [], templates: [] }, proposals: [], scope: projectScope(), view: "overview", search: "", selectedId: null, context: null, compare: null, drawer: "context", dirty: false, history: [], future: [], layout: {}, scopeBack: [], scopeForward: [], tour: null, dragging: null, drawerOpen: false, busy: false, formId: null, formDirty: false, contextRequest: 0, contextError: "", drawerRequest: 0 };
 const $ = (id) => document.getElementById(id);
 
-async function request(url, options) { const response = await fetch(url, options); const data = await response.json(); if (!response.ok) throw new Error(data.message || "Request failed"); return data; }
+const projectClient = createProjectClient(location.pathname);
+const request = projectClient.request;
 function scopeKey() { return `${state.scope.id}:${state.view}`; }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function snapshot() { return { graph: clone(state.graph), layout: clone(state.layout) }; }
@@ -278,7 +282,7 @@ async function renderDrawerOriginal(content, generation) {
   if (state.drawer === "context") { content.innerHTML = `<div class="drawer-card"><strong>Current scope</strong>${escapeHtml(state.scope.title)}<br>Depth ${state.scope.depth}</div><div class="drawer-card"><strong>Editing model</strong>Changes are direct, traceable and undoable.</div><div class="drawer-card"><strong>Agent context</strong>Markdown is generated from the canonical JSON graph for the current project and focus.</div>`; return; }
   if (state.drawer === "compare") { try { state.compare = await request("/api/compare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base: state.baseline, candidate: state.graph }) }); if (generation !== state.drawerRequest || !state.drawerOpen || state.drawer !== "compare") return; const c = state.compare; content.innerHTML = `<div class="drawer-card"><strong>Changes</strong>${c.nodesAdded.length} added · ${c.nodesRemoved.length} removed · ${c.nodesChanged.length} changed nodes</div><div class="drawer-card"><strong>Relationships</strong>${c.edgesAdded.length} added · ${c.edgesRemoved.length} removed</div>`; } catch (error) { if (generation === state.drawerRequest) content.textContent = error.message; } return; }
   if (state.drawer === "library") { const cards = [...state.library.patterns.map((item) => ({ ...item, kind: "Pattern" })), ...state.library.templates.map((item) => ({ ...item, kind: "Template" }))]; content.innerHTML = cards.length ? cards.map((item) => `<div class="drawer-card"><strong>${escapeHtml(item.kind)} · ${escapeHtml(item.title)}</strong>${escapeHtml(item.problem || item.target || "Reusable knowledge for the current scope.")}<br><button type="button" data-library="${escapeHtml(item.id)}">Preview in scope</button></div>`).join("") : `<span class="muted">Library is empty.</span>`; document.querySelectorAll("[data-library]").forEach((button) => button.addEventListener("click", () => pages.openItem([...state.library.patterns.map((item, index) => ({ id: item.id, key: `pattern-${index}` })), ...state.library.templates.map((item, index) => ({ id: item.id, key: `template-${index}` }))].find(item => item.id === button.dataset.library)?.key, button))); return; }
-  const tour = state.tour?.tour || state.tours[0]; if (!tour) { content.innerHTML = `<span class="muted">No guided tours configured.</span>`; return; } if (!state.tour) content.innerHTML = `<div class="drawer-card"><strong>${escapeHtml(tour.title)}</strong>${tour.steps.length} semantic steps<br><button id="start-tour" type="button">Start tour</button></div>`; else content.innerHTML = `<div class="drawer-card"><strong>${escapeHtml(tour.title)}</strong>Step ${state.tour.index + 1} of ${tour.steps.length}<br>${escapeHtml(tour.steps[state.tour.index].explanation)}<br><button id="tour-back" type="button" ${state.tour.index === 0 ? "disabled" : ""}>Back</button> <button id="tour-next" type="button">${state.tour.index === tour.steps.length - 1 ? "Finish" : "Next"}</button></div>`; $("start-tour")?.addEventListener("click", () => startTour(tour)); $("tour-back")?.addEventListener("click", () => { state.tour.index -= 1; showTourStep(); }); $("tour-next")?.addEventListener("click", () => { if (state.tour.index >= tour.steps.length - 1) { state.tour = null; render(); toast("Tour complete"); } else { state.tour.index += 1; showTourStep(); } });
+  const tour = state.tour?.tour || state.tours[0]; if (!tour) { content.innerHTML = `<span class="muted">No guided tours configured.</span>`; return; } if (!state.tour) content.innerHTML = `<div class="drawer-card"><strong>${escapeHtml(tour.title)}</strong>${tour.steps.length} semantic steps<br><button id="start-tour" type="button">Start tour</button></div>`; else content.innerHTML = `<div class="drawer-card"><strong>${escapeHtml(tour.title)}</strong>Step ${state.tour.index + 1} of ${tour.steps.length}<br>${escapeHtml(tour.steps[state.tour.index].explanation)}<br><button id="tour-back" type="button" ${state.tour.index === 0 ? "disabled" : ""}>Back</button> <button id="tour-next" type="button">${state.tour.index === tour.steps.length - 1 ? "Finish" : "Next"}</button></div>`; $("start-tour")?.addEventListener("click", () => startTour(tour)); $("tour-back")?.addEventListener("click", () => { state.tour.index -= 1; showTourStep(); }); $("tour-next")?.addEventListener("click", () => { if (state.tour.index >= state.tour.tour.steps.length - 1) { state.tour = null; render(); toast("Tour complete"); } else { state.tour.index += 1; showTourStep(); } });
 }
 async function previewProposal(id) { try { const result = await request(`/api/proposals/${encodeURIComponent(id)}/preview`, { method: "POST" }); const target = $(`proposal-detail-${id}`); if (target) target.innerHTML = `<p><strong>Preview</strong> ${result.diff.nodesAdded.length} added · ${result.diff.nodesChanged.length} changed · ${result.diff.edgesAdded.length} relationships</p><p>${result.canApply ? "Ready for human approval." : "Cannot apply: stale or invalid."}</p>${result.diagnostics.length ? `<p class="muted">${result.diagnostics.map((item) => escapeHtml(item.message)).join("<br>")}</p>` : ""}`; } catch (error) { toast(error.message); } }
 async function applyProposal(id) {
@@ -416,9 +420,9 @@ $("focus-here-button").addEventListener("click", () => {
   if (node) setScope({ id: `focus:${node.id}`, title: node.title, rootIds: [node.id], depth: 2 });
 });
 $("context-refresh").addEventListener("click", refreshContext);
-$("save-button").addEventListener("click", async () => {
-  if (state.busy) return;
-  if (state.formDirty) return toast("Apply object changes before saving the model.");
+async function saveWorkspace() {
+  if (state.busy || state.dragging || !state.graph) return false;
+  if (state.formDirty) { toast("Apply object changes before saving the model."); return false; }
   const submitted = snapshot();
   state.busy = true;
   render();
@@ -428,9 +432,11 @@ $("save-button").addEventListener("click", async () => {
     state.diagnostics = response.diagnostics || [];
     state.dirty = false;
     toast("Product model saved");
-  } catch (error) { toast(error.message); }
+    return true;
+  } catch (error) { toast(error.message); return false; }
   finally { state.busy = false; render(); refreshContext(); }
-});
+}
+$("save-button").addEventListener("click", saveWorkspace);
 $("node-form").addEventListener("input", () => { state.formDirty = true; setStatus("Object draft"); });
 $("node-form").addEventListener("submit", (event) => {
   event.preventDefault();
@@ -497,6 +503,21 @@ const pages = createStudioPages({
   review: () => openDrawer("compare"),
 });
 initAppearance();
+initDocumentBrowser({ request, graph: () => state.graph, isDirty: () => state.dirty, selection: () => state.selectedId, inspect: selectNode });
+initProjectSession({
+  projectId: projectClient.projectId,
+  dirty: () => state.dirty || state.formDirty,
+  busy: () => state.busy || Boolean(state.dragging),
+  save: async () => {
+    if (state.formDirty) {
+      if (!$("node-form").reportValidity()) return false;
+      $("node-form").requestSubmit();
+      if (state.formDirty) return false;
+    }
+    return saveWorkspace();
+  },
+  discard: () => { state.dirty = false; state.formDirty = false; },
+});
 $("lens-list").addEventListener("keydown", event => navigateChoices(event, "[data-lens]"));
 document.querySelector(".page-nav").addEventListener("keydown", event => navigateChoices(event, "[data-page]"));
 $("fit-view").addEventListener("click", () => { if (!state.graph) return; cameras.delete(scopeKey()); renderGraph(); });

@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Projects · Product Graph</title><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/projects.css" data-workspace-style></head>
+<body class="projects-page">
+<header class="projects-header"><a href="/" class="project-brand">◇ Product Graph</a><span>LOCAL WORKSPACE</span><label>Appearance <select id="appearance"><option value="light">Paper</option><option value="dark">Dark</option><option value="system">System</option></select></label></header>
+<main class="projects-home"><div class="projects-intro"><div><p class="eyebrow">YOUR PRODUCTS, CONNECTED WITH INTENTION</p><h1>A place for every product.</h1><p>Separate projects. Plain files. One studio to keep the meaning connected.</p></div><span class="projects-note">Start small.<br>Keep the context.</span></div>
+<div class="project-catalog-toolbar"><label>Find a project<input id="project-search" class="text-input" type="search" placeholder="Search by name or location"></label><span id="projects-count" role="status"></span><button id="open-project" class="button button-secondary" type="button">Open existing folder</button><button id="new-project" class="button button-primary" type="button">＋ New project</button></div>
+<p id="catalog-error" class="workspace-error" role="status"></p><section id="project-cards" class="project-cards" aria-label="Projects">Loading projects…</section>
+<footer class="catalog-footer"><span>Ordered by last opened. Removing a card never deletes its folder.</span><span id="managed-location"></span></footer></main>
+<script type="module" src="/projects.js"></script></body></html>

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { atomicText, localPath, LocalError } from "./local-files.ts";
 import { LEGACY_REGION_MAP, type Graph, type GraphDocument, type GraphEdge, type GraphNode, type LayoutState, type ProjectManifest } from "./types.ts";
 import type { ProposalPatch } from "./proposals.ts";
 
@@ -46,20 +47,49 @@ export function loadLayouts(projectRoot: string): Record<string, LayoutState> {
   return Object.fromEntries(fs.readdirSync(directory).filter((file) => file.endsWith(".json")).sort().map((file) => [path.basename(file, ".json"), readJson<LayoutState>(path.join(directory, file))]));
 }
 
-export function saveLayouts(projectRoot: string, layouts: Record<string, LayoutState>): void {
-  for (const [view, layout] of Object.entries(layouts)) writeJson(path.join(projectRoot, "layout", `${view}.json`), layout);
+export function prepareLayoutWrite(projectRoot: string, layouts: Record<string, LayoutState>): () => void {
+  if (!layouts || typeof layouts !== "object" || Array.isArray(layouts)) throw new LocalError(400, "Invalid layout map");
+  const entries = Object.entries(layouts).map(([view, layout]) => {
+    if (!/^[a-zA-Z0-9:._-]{1,240}$/.test(view) || !layout || typeof layout !== "object" || !layout.positions || typeof layout.positions !== "object" || Array.isArray(layout.positions)) throw new LocalError(400, "Invalid layout key or data");
+    for (const position of Object.values(layout.positions)) {
+      if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) throw new LocalError(400, "Invalid layout coordinates");
+    }
+    return [localPath(projectRoot, `layout/${view}.json`), `${JSON.stringify(layout, null, 2)}\n`] as const;
+  });
+  if (entries.length > 5000 || entries.some(([, text]) => Buffer.byteLength(text) > 1024 * 1024)) throw new LocalError(413, "Layout exceeds storage limits");
+  return () => { for (const [file, text] of entries) atomicText(file, text); };
 }
 
-export function saveGraph(projectRoot: string, graph: Graph): void {
-  writeJson(path.join(projectRoot, "project.json"), graph.manifest);
-  graph.nodes.forEach((node) => {
-    const persisted = { ...node, region: node.region || LEGACY_REGION_MAP[node.layer || ""] || "product" };
-    delete persisted.layer;
-    writeJson(path.join(projectRoot, "graph", "nodes", `${node.id.replace(/[^a-zA-Z0-9._-]+/g, "-")}.json`), persisted);
+export function saveLayouts(projectRoot: string, layouts: Record<string, LayoutState>): void { prepareLayoutWrite(projectRoot, layouts)(); }
+
+export function prepareGraphWrite(projectRoot: string, graph: Graph): () => void {
+  // Preflight every filename before any write; reject IDs that normalize to the same file.
+  const groups = [
+    ["graph/nodes", graph.nodes.map(node => { const persisted = { ...node, region: node.region || LEGACY_REGION_MAP[node.layer || ""] || "product" }; delete persisted.layer; return [node.id, persisted] as const; })],
+    ["graph/edges", graph.edges.map((edge, index) => [edge.id || `${edge.from}-${edge.kind}-${edge.to}-${index}`, edge] as const)],
+    ["graph/documents", graph.documents.map(document => [document.id, document] as const)],
+  ] as const;
+  const plan = groups.map(([directory, entries]) => {
+    if (entries.length > 5000) throw new LocalError(413, "Too many graph records");
+    const names = entries.map(([id]) => `${id.replace(/[^a-zA-Z0-9._-]+/g, "-")}.json`);
+    if (new Set(names.map(name => name.toLowerCase())).size !== names.length) throw new LocalError(400, `IDs collide as filenames in ${directory}`);
+    const files = entries.map(([, value], index) => [localPath(projectRoot, `${directory}/${names[index]}`), `${JSON.stringify(value, null, 2)}\n`] as const);
+    if (names.some(name => name.length > 240) || files.some(([, text]) => Buffer.byteLength(text) > 1024 * 1024)) throw new LocalError(413, "Graph record exceeds storage limits");
+    const target = localPath(projectRoot, directory);
+    const stale = fs.existsSync(target) ? fs.readdirSync(target).filter(name => name.endsWith(".json") && !names.includes(name)).map(name => localPath(projectRoot, `${directory}/${name}`)) : [];
+    return { files, stale };
   });
-  graph.edges.forEach((edge, index) => writeJson(path.join(projectRoot, "graph", "edges", `${(edge.id || `${edge.from}-${edge.kind}-${edge.to}-${index}`).replace(/[^a-zA-Z0-9._-]+/g, "-")}.json`), edge));
-  graph.documents.forEach((document) => writeJson(path.join(projectRoot, "graph", "documents", `${document.id.replace(/[^a-zA-Z0-9._-]+/g, "-")}.json`), document));
+  const manifest = localPath(projectRoot, "project.json");
+  const manifestText = `${JSON.stringify(graph.manifest, null, 2)}\n`;
+  if (Buffer.byteLength(manifestText) > 1024 * 1024) throw new LocalError(413, "Project manifest exceeds storage limits");
+  return () => {
+    for (const group of plan) for (const [file, text] of group.files) atomicText(file, text);
+    for (const group of plan) for (const file of group.stale) fs.unlinkSync(file);
+    atomicText(manifest, manifestText);
+  };
 }
+
+export function saveGraph(projectRoot: string, graph: Graph): void { prepareGraphWrite(projectRoot, graph)(); }
 
 export function loadProposals(projectRoot: string): ProposalPatch[] {
   return readJsonFiles<ProposalPatch>(path.join(projectRoot, "agent-context", "proposals"));
