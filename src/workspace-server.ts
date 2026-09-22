@@ -35,7 +35,7 @@ export function createWorkspaceHandler(home: string) {
         // Resolve for THIS request. Never store a mutable server-wide active project.
         const root = registry.resolve(id);
         if (!suffix && request.method === "GET") return json(response, 200, { project: registry.list().find(item => item.id === id) });
-        const allowed = /^\/(workspace|graph|context|agent-context|compare|commands|proposals(?:\/[^/]+(?:\/(?:preview|apply|reject))?)?|documents(?:\/read)?)$/;
+        const allowed = /^\/(workspace|graph|context|agent-context|task-context|authoring(?:\/(?:board|proposal))?|compare|commands|proposals(?:\/[^/]+(?:\/(?:preview|apply|reject))?)?|documents(?:\/read)?)$/;
         if (!allowed.test(suffix)) throw new LocalError(404, "Unknown project endpoint");
         request.url = `/api${suffix}${url.search}`;
         return await createProjectHandler(root, { requireRevision: true })(request, response);

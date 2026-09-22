@@ -14,6 +14,8 @@ import { graphFingerprint } from "./revision.ts";
 import { assertProjectFiles, LocalError } from "./local-files.ts";
 import { guardLocalRequest, readBody } from "./local-http.ts";
 import { listDocuments, readDocument } from "./documents.ts";
+import { loadSketch, saveSketch, createSketchProposal, sketchOriginCurrent, AUTHORING_KINDS, SEMANTIC_RELATIONS, objectHash } from "./visual-authoring.ts";
+import { buildTaskContext } from "./task-context.ts";
 
 const uiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../ui");
 
@@ -79,6 +81,16 @@ export function createProjectHandler(projectRoot: string, options: { requireRevi
         writeLayout();
         return sendJson(response, 200, { graph, layout: payload.layout || {}, diagnostics, workspaceRevision: workspaceRevision(projectRoot) });
       }
+      if (url.pathname === "/api/authoring" && request.method === "GET") return sendJson(response, 200, {
+        ...loadSketch(projectRoot), graphRevision: graphFingerprint(loadGraph(projectRoot)), kinds: AUTHORING_KINDS, relations: SEMANTIC_RELATIONS,
+      });
+      if (url.pathname === "/api/authoring/board" && request.method === "POST") return sendJson(response, 200, saveSketch(projectRoot, JSON.parse(await body(request, 2 * 1024 * 1024))));
+      if (url.pathname === "/api/authoring/proposal" && request.method === "POST") {
+        const input = JSON.parse(await body(request, 256 * 1024));
+        checkRevision(request);
+        return sendJson(response, 201, createSketchProposal(projectRoot, input));
+      }
+      if (url.pathname === "/api/task-context" && request.method === "POST") return sendJson(response, 200, buildTaskContext(projectRoot, JSON.parse(await body(request, 16384))));
       if (url.pathname === "/api/documents" && request.method === "GET") return sendJson(response, 200, listDocuments(projectRoot));
       if (url.pathname === "/api/documents/read" && request.method === "GET") return sendJson(response, 200, readDocument(projectRoot, url.searchParams.get("path") || ""));
       if (url.pathname === "/api/agent-context" && request.method === "GET") {
@@ -105,11 +117,15 @@ export function createProjectHandler(projectRoot: string, options: { requireRevi
         const graph = loadGraph(projectRoot);
         if (segments[1] === "preview") {
           const preview = previewProposal(graph, proposal);
-          return sendJson(response, 200, { proposal, diff: compareGraphs(graph, preview.graph), diagnostics: preview.diagnostics, revision: graphFingerprint(graph), canApply: proposal.status === "pending" && proposal.baseRevision === graphFingerprint(graph) && !preview.diagnostics.some((item) => item.level === "error") });
+          return sendJson(response, 200, { proposal, proposalRevision: objectHash(proposal), diff: compareGraphs(graph, preview.graph), diagnostics: preview.diagnostics, revision: graphFingerprint(graph), canApply: proposal.status === "pending" && sketchOriginCurrent(projectRoot, proposal) && proposal.baseRevision === graphFingerprint(graph) && !preview.diagnostics.some((item) => item.level === "error") });
         }
         if (segments[1] === "apply") {
           checkRevision(request);
           if (proposal.status !== "pending") throw new LocalError(409, "Only pending proposals can be applied");
+          if (!sketchOriginCurrent(projectRoot, proposal)) throw new LocalError(409, "Sketch source changed. Create and review a new proposal before applying.");
+          const reviewed = request.headers["x-product-graph-proposal-revision"];
+          if (proposal.authoring && !reviewed) throw new LocalError(428, "Preview this sketch proposal before applying; its reviewed revision is required.");
+          if (reviewed && reviewed !== objectHash(proposal)) throw new LocalError(409, "Proposal content changed after review. Preview it again before applying.");
           try {
             const candidate = applyProposal(graph, proposal);
             const diagnostics = validateGraph(candidate);

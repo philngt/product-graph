@@ -1,6 +1,24 @@
 # Product Graph
 
-Graph-native workspace for modelling product intent, business rules, workflows, domain, experience and architecture from one canonical product graph.
+A local visual workspace where **humans and agents build shared product meaning**: sketch ideas, make definitions explicit, review changes, and build traceable task context from one canonical product model.
+
+**Tự do khi suy nghĩ. Có cấu trúc khi định nghĩa. Có kiểm chứng khi triển khai.**
+
+Read the [product thesis](docs/product-thesis.md) for the sketchnote / no-code / low-code direction and its permission boundaries. Workflow, domain and architecture are lenses; a sketch arrow is not executable behavior. SwiftUI generation remains a separate milestone.
+
+## Sketch → define → review → hand off
+
+Open **Project tools → Sketch & define**. Capture text notes, questions and assumptions; arrange cards and connect untyped arrows. Save the sketch, select cards, and explicitly choose object kinds or reuse existing objects. Questions and assumptions require acknowledgement. Choose each relationship's meaning, create a pending proposal, inspect its exact commands and source snapshot, then approve/apply it. Original notes are retained; new objects start as drafts.
+
+**Context for agent** builds a read-only artifact from explicit task roots, required project constraints, linked Markdown source and optional unconfirmed notes. It shows inclusion/exclusion reasons, gaps, character-budget accounting and source/build hashes, then exports JSON or Markdown. Input/output/custom-reference fields are declarations only; nothing runs or generates code.
+
+```sh
+npm run context:task -- /path/to/project feature:rotation "Implement cooldown" json
+npm run test:authoring
+PRODUCT_GRAPH_BROWSER=/path/to/chromium npm run test:authoring:browser
+```
+
+This new task-context contract is distinct from the legacy `framework context` graph summary. No built-in agent/provider or new MCP tool is required. See [visual authoring: APIs, guarantees, tests and limits](docs/visual-authoring.md).
 
 ## Requirements
 
