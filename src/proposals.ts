@@ -13,6 +13,7 @@ export interface ProposalPatch {
   baseRevision?: string;
   createdAt?: string;
   status?: ProposalStatus;
+  authoring?: import("./visual-authoring.ts").AuthoringOrigin;
 }
 
 export interface ProposalReview {

@@ -12,7 +12,15 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts tests/*.test.mjs",
     "test:studio": "node --test tests/studio.test.mjs",
     "check": "node --experimental-strip-types src/cli.ts check .",
-    "test:studio:browser": "node --test tests/studio-browser.test.mjs"
+    "test:studio:browser": "node --test tests/studio-browser.test.mjs tests/paper-studio-browser.test.mjs",
+    "test:studio:layout": "node --test tests/canvas-layout.test.mjs",
+    "workspace": "node --experimental-strip-types src/workspace-cli.ts",
+    "test:workspace": "node --experimental-strip-types --test tests/projects.test.ts tests/documents.test.ts tests/project-client.test.mjs",
+    "test:workspace:browser": "node --experimental-strip-types --test tests/projects-browser.test.mjs",
+    "test:workspace:live": "node --experimental-strip-types --test tests/projects-live-browser.test.mjs",
+    "context:task": "node --experimental-strip-types src/task-context-cli.ts",
+    "test:authoring": "node --experimental-strip-types --test tests/visual-authoring.test.ts tests/task-context.test.ts tests/authoring-http.test.ts",
+    "test:authoring:browser": "node --experimental-strip-types --test tests/authoring-browser.test.mjs"
   },
   "engines": {
     "node": ">=22"

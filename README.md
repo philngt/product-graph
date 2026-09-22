@@ -1,6 +1,24 @@
 # Product Graph
 
-Graph-native workspace for modelling product intent, business rules, workflows, domain, experience and architecture from one canonical product graph.
+A local visual workspace where **humans and agents build shared product meaning**: sketch ideas, make definitions explicit, review changes, and build traceable task context from one canonical product model.
+
+**Tự do khi suy nghĩ. Có cấu trúc khi định nghĩa. Có kiểm chứng khi triển khai.**
+
+Read the [product thesis](docs/product-thesis.md) for the sketchnote / no-code / low-code direction and its permission boundaries. Workflow, domain and architecture are lenses; a sketch arrow is not executable behavior. SwiftUI generation remains a separate milestone.
+
+## Sketch → define → review → hand off
+
+Open **Project tools → Sketch & define**. Capture text notes, questions and assumptions; arrange cards and connect untyped arrows. Save the sketch, select cards, and explicitly choose object kinds or reuse existing objects. Questions and assumptions require acknowledgement. Choose each relationship's meaning, create a pending proposal, inspect its exact commands and source snapshot, then approve/apply it. Original notes are retained; new objects start as drafts.
+
+**Context for agent** builds a read-only artifact from explicit task roots, required project constraints, linked Markdown source and optional unconfirmed notes. It shows inclusion/exclusion reasons, gaps, character-budget accounting and source/build hashes, then exports JSON or Markdown. Input/output/custom-reference fields are declarations only; nothing runs or generates code.
+
+```sh
+npm run context:task -- /path/to/project feature:rotation "Implement cooldown" json
+npm run test:authoring
+PRODUCT_GRAPH_BROWSER=/path/to/chromium npm run test:authoring:browser
+```
+
+This new task-context contract is distinct from the legacy `framework context` graph summary. No built-in agent/provider or new MCP tool is required. See [visual authoring: APIs, guarantees, tests and limits](docs/visual-authoring.md).
 
 ## Requirements
 
@@ -20,7 +38,7 @@ npm run framework -- mcp ./my-project
 
 The canonical input is JSON manifests under `graph/` plus Markdown under `documents/`. Generated artifacts are written as both JSON and Markdown under `projections/`, with the agent bundle under `agent-context/`. Node semantics use typed regions such as `intent`, `product`, `business`, `workflow`, `domain`, `experience`, `architecture`, `decision` and `quality`.
 
-JSON remains the canonical product model. Markdown in `agent-context/` is generated, scoped context for agents; it is not a second source of truth. The IDE writes graph commands to JSON, validates the result and regenerates the Markdown context.
+JSON remains the canonical product model. Markdown in `agent-context/` is generated, scoped context for agents; it is not a second source of truth. The Studio validates and saves the canonical graph. Regenerate the Markdown projections and context explicitly with the `project` and `context` CLI commands; saving in Studio does not regenerate those files.
 
 `framework mcp` starts a stdio MCP server. Agents can search the graph, request scoped Markdown context, validate, compare and create reviewable proposals. MCP cannot apply a proposal directly: a human reviews it in Product Graph Studio under `Agent proposals`, then applies or rejects it.
 
@@ -73,3 +91,22 @@ PRODUCT_GRAPH_BROWSER=/path/to/chromium npm run test:studio:browser
 ```
 
 The browser smoke test uses the real UI with in-memory API fixtures; it is not a server/persistence integration test. The existing CLI/MCP tests remain part of `npm test`.
+
+## Multiple projects and documents
+
+```sh
+npm run workspace
+# Or choose a catalog directory and port:
+npm run workspace -- /absolute/path/to/catalog 4173
+```
+
+The Projects home creates local projects, opens existing Product Graph folders in place and remembers recent locations. Each project opens at its own `/project/:id/` URL on the same server. Use **Projects** in Studio to switch; unsaved work requires Save, Discard or Cancel. Removing a catalog entry never deletes its folder.
+
+**Documents** reads Markdown source and generated context, with an outline, local links, backlinks and linked product objects. It is read-only: no rich-text editing, HTML execution, file moving or automatic semantic edge creation. Workspace saves use a checked revision; conflicts preserve your local edits for manual reconciliation.
+
+See [multi-project usage and boundaries](docs/multi-project-workspace.md) and [lessons from Hibi](docs/hibi-document-management.md). MCP remains project-specific. This does not add a SwiftUI compiler.
+
+```sh
+npm run test:workspace
+PRODUCT_GRAPH_BROWSER=/path/to/chromium npm run test:workspace:browser
+```
