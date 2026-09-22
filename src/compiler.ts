@@ -1,9 +1,13 @@
-import type { Diagnostic, Graph, GraphNode } from "./types.ts";
+import type { Diagnostic, Graph, GraphNode, GraphEdge, GraphDocument } from "./types.ts";
+import type { ImplementationTarget } from "./implementation-targets.ts";
 
+/** Product semantics are independent of language, runtime and UI framework. */
 export interface ProductIR {
   schemaVersion: string;
   projectId: string;
   nodes: GraphNode[];
+  edges: GraphEdge[];
+  documents: GraphDocument[];
   traceability: Record<string, string[]>;
 }
 
@@ -14,12 +18,13 @@ export interface GeneratedFile {
   sourceIds: string[];
 }
 
+/** Adapter contract, not a built-in implementation. No generators are registered yet. */
 export interface TargetTemplate {
   id: string;
   version: string;
-  target: "ios-swiftui";
-  validate(ir: ProductIR): Diagnostic[];
-  generate(ir: ProductIR): GeneratedFile[];
+  target: string;
+  validate(ir: ProductIR, deployment: ImplementationTarget): Diagnostic[];
+  generate(ir: ProductIR, deployment: ImplementationTarget): GeneratedFile[];
 }
 
 export interface CompileResult {
@@ -29,10 +34,11 @@ export interface CompileResult {
 }
 
 export function normalizeProductGraph(graph: Graph): ProductIR {
+  const { nodes, edges, documents } = structuredClone(graph);
   return {
     schemaVersion: graph.manifest.schemaVersion,
     projectId: graph.manifest.projectId,
-    nodes: graph.nodes,
-    traceability: Object.fromEntries(graph.nodes.map((node) => [node.id, [node.id]])),
+    nodes, edges, documents,
+    traceability: Object.fromEntries(nodes.map(node => [node.id, [node.id]])),
   };
 }

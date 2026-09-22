@@ -16,6 +16,7 @@ import { guardLocalRequest, readBody } from "./local-http.ts";
 import { listDocuments, readDocument } from "./documents.ts";
 import { loadSketch, saveSketch, createSketchProposal, sketchOriginCurrent, AUTHORING_KINDS, SEMANTIC_RELATIONS, objectHash } from "./visual-authoring.ts";
 import { buildTaskContext } from "./task-context.ts";
+import { handleImplementationRequest } from "./implementation-api.ts";
 
 const uiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../ui");
 
@@ -61,6 +62,7 @@ export function createProjectHandler(projectRoot: string, options: { requireRevi
     try {
       guardLocalRequest(request);
       assertProjectFiles(projectRoot);
+      if (await handleImplementationRequest(projectRoot, request, response)) return;
       const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
       if ((url.pathname === "/api/graph" || url.pathname === "/api/workspace") && request.method === "GET") {
         const graph = loadGraph(projectRoot);
