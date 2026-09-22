@@ -1,4 +1,7 @@
 import { navigate, neighborhood, projectScope, projectView, regionOf, travel } from "./studio-state.js";
+import { arrangeGraph, graphBounds, connectorGeometry, zoomCamera, CARD } from "./canvas-layout.js";
+import { initAppearance, navigateChoices } from "./studio-controls.js";
+import { createStudioPages } from "./studio-pages.js";
 
 const VIEWS = ["overview", "product", "business", "workflow", "domain", "experience", "architecture", "verification", "decisions", "impact"];
 const labels = { overview: "Overview", product: "Product", business: "Business", workflow: "Workflow", domain: "Domain", experience: "Experience", architecture: "Architecture", verification: "Verification", decisions: "Decisions", impact: "Related impact" };
@@ -63,7 +66,7 @@ function markDirty() {
 
 function setStatus(text, dirty = state.dirty) {
   $("save-state").textContent = state.busy ? "Saving…" : dirty ? "Unsaved changes" : state.formDirty ? "Object draft" : text;
-  $("save-state").style.color = dirty || state.formDirty ? "#e6b86a" : "";
+  $("save-state").style.color = dirty || state.formDirty ? "var(--warning)" : "";
   $("save-button").disabled = state.busy;
   $("undo-button").disabled = state.busy || !state.history.length;
   $("redo-button").disabled = state.busy || !state.future.length;
@@ -94,12 +97,61 @@ function renderLenses() {
 }
 
 function renderNodeList() { const nodes = scopedNodes(); $("node-list").innerHTML = nodes.length ? nodes.map((node) => `<button class="node-button ${node.id === state.selectedId ? "active" : ""}" data-node="${escapeHtml(node.id)}" type="button"><i class="layer-icon" style="background:${colors[regionOf(node)] || "#91a0b4"}"></i><span class="node-copy"><strong>${escapeHtml(node.title)}</strong><small>${escapeHtml(regionOf(node))} · ${escapeHtml(node.type)}</small></span></button>`).join("") : `<p class="muted" style="padding:.5rem">No objects in this scope/lens.</p>`; document.querySelectorAll("[data-node]").forEach((button) => button.addEventListener("click", () => selectNode(button.dataset.node))); }
-function positionFor(node, index) { const stored = state.layout[scopeKey()]?.positions?.[node.id]; if (stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)) return stored; return { x: 150 + (index % 3) * 285, y: 120 + Math.floor(index / 3) * 145 }; }
-function renderGraph() { const svg = $("graph-svg"); const nodes = scopedNodes(); svg.setAttribute("viewBox", `0 0 1000 ${Math.max(680, 160 + Math.ceil(nodes.length / 3) * 145)}`); const positioned = nodes.map((node, index) => ({ node, ...positionFor(node, index) })); const byId = new Map(positioned.map((item) => [item.node.id, item])); $("empty-state").hidden = nodes.length > 0; $("active-layer").textContent = `${state.scope.title} · ${labels[state.view]}`.toUpperCase(); $("scope-title").textContent = state.scope.title; $("canvas-summary").textContent = `${nodes.length} visible objects · ${state.scope.id === "project" ? "project scope" : `focus depth ${state.scope.depth}`}`; const edges = state.graph.edges.filter((edge) => byId.has(edge.from) && byId.has(edge.to)); svg.innerHTML = `<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#496274"></path></marker></defs>` + edges.map((edge) => { const a = byId.get(edge.from); const b = byId.get(edge.to); const active = state.selectedId === edge.from || state.selectedId === edge.to; return `<line class="edge-line ${active ? "highlight" : ""}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" />`; }).join("") + positioned.map(({ node, x, y }) => `<g class="graph-node ${node.id === state.selectedId ? "selected" : ""}" data-graph-node="${escapeHtml(node.id)}" transform="translate(${x - 100},${y - 30})" tabindex="0" role="button" aria-label="${escapeHtml(node.title)}, ${escapeHtml(regionOf(node))} node"><rect class="node-card" width="200" height="60" rx="10"></rect><line class="node-accent accent-${regionOf(node)}" x1="2" y1="10" x2="2" y2="50"></line><text class="node-title" x="17" y="27">${escapeHtml(trim(node.title, 24))}</text><text class="node-type" x="17" y="45">${escapeHtml(regionOf(node))} · ${escapeHtml(node.type)}</text></g>`).join(""); document.querySelectorAll("[data-graph-node]").forEach((node) => { node.addEventListener("click", () => selectNode(node.dataset.graphNode)); node.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectNode(node.dataset.graphNode); } }); node.addEventListener("pointerdown", (event) => startDrag(event, node.dataset.graphNode)); }); }
+// Camera and default geometry belong to the view, never the canonical product model.
+const cameras = new Map();
+let displayedPositions = {};
+let displayedSignature = "";
+function renderGraph() {
+  const svg = $("graph-svg"), projection = projectView(state.graph, state);
+  const nodes = projection.nodes;
+  const positions = arrangeGraph(nodes, projection.edges, {
+    mode: ["workflow", "architecture"].includes(state.view) ? "layered" : "grid",
+    positions: state.layout[scopeKey()]?.positions || {}, preserveAll: true,
+  });
+  displayedPositions = positions;
+  const signature = JSON.stringify([scopeKey(), nodes.map(n => n.id)]);
+  if (displayedSignature !== signature) { cameras.delete(scopeKey()); displayedSignature = signature; }
+  if (!cameras.has(scopeKey())) cameras.set(scopeKey(), graphBounds(positions));
+  const camera = cameras.get(scopeKey());
+  svg.setAttribute("viewBox", `${camera.x} ${camera.y} ${camera.width} ${camera.height}`);
+  $("empty-state").hidden = nodes.length > 0;
+  $("active-layer").textContent = `${state.scope.id === "project" ? "PROJECT" : "FOCUS"} · ${labels[state.view]}`;
+  $("scope-title").textContent = state.scope.title;
+  $("canvas-summary").textContent = `${nodes.length} visible objects · ${state.scope.id === "project" ? "project scope" : `focus depth ${state.scope.depth}`}`;
+  const lanes = new Map();
+  const edges = projection.edges.map(edge => {
+    const pair = JSON.stringify([edge.from, edge.to].sort()), lane = lanes.get(pair) || 0;
+    lanes.set(pair, lane + 1);
+    const geometry = connectorGeometry(positions[edge.from], positions[edge.to], edge.from === edge.to, lane);
+    const active = edge.from === state.selectedId || edge.to === state.selectedId;
+    return `<g><title>${escapeHtml(edge.kind)}: ${escapeHtml(edge.from)} → ${escapeHtml(edge.to)}</title><path class="edge-line ${active ? "highlight" : ""}" d="${geometry.path}"/><text class="edge-label" text-anchor="middle" x="${geometry.label.x}" y="${geometry.label.y - 7}">${escapeHtml(trim(edge.kind, 26))}</text></g>`;
+  }).join("");
+  svg.innerHTML = `<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="edge-arrow" d="M 0 0 L 10 5 L 0 10 z"/></marker></defs>` + edges + nodes.map(node => {
+    const p = positions[node.id];
+    return `<g class="graph-node ${node.id === state.selectedId ? "selected" : ""}" data-graph-node="${escapeHtml(node.id)}" transform="translate(${p.x - CARD.width / 2},${p.y - CARD.height / 2})" tabindex="0" role="button" aria-label="${escapeHtml(node.title)}, ${escapeHtml(regionOf(node))} node" aria-pressed="${node.id === state.selectedId}"><title>${escapeHtml(node.title)} · ${escapeHtml(node.id)}</title><rect class="node-card" width="${CARD.width}" height="${CARD.height}" rx="5"/><line class="node-accent accent-${escapeHtml(regionOf(node))}" x1="1" y1="14" x2="1" y2="74"/><text class="node-type" x="17" y="22">${escapeHtml(regionOf(node).toUpperCase())}</text><text class="node-title" x="17" y="47">${escapeHtml(trim(node.title, 24))}</text><text class="node-type" x="17" y="68">${escapeHtml(trim(node.type, 26))}</text>${p.pinned ? '<text class="node-pin" x="180" y="22">PIN</text>' : ''}</g>`;
+  }).join("");
+  svg.querySelectorAll("[data-graph-node]").forEach(node => {
+    node.addEventListener("click", () => selectNode(node.dataset.graphNode));
+    node.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault(); selectNode(node.dataset.graphNode);
+        [...svg.querySelectorAll("[data-graph-node]")].find(item => item.dataset.graphNode === node.dataset.graphNode)?.focus();
+      }
+    });
+    node.addEventListener("pointerdown", event => startDrag(event, node.dataset.graphNode));
+  });
+  $("auto-layout").disabled = state.busy || !nodes.length || Boolean(state.dragging);
+  $("unpin-selection").disabled = state.busy || !state.layout[scopeKey()]?.positions?.[state.selectedId]?.pinned || Boolean(state.dragging);
+}
 function startDrag(event, id) {
   if (event.button !== 0 || state.busy) return;
   const before = snapshot();
   const key = scopeKey();
+  const matrixAtStart = $("graph-svg").getScreenCTM();
+  if (!matrixAtStart || !displayedPositions[id]) return;
+  const start = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrixAtStart.inverse());
+  const initial = { ...displayedPositions[id] };
+  state.dragging = id;
   let moved = false;
   const move = (moveEvent) => {
     if (moveEvent.pointerId !== event.pointerId) return;
@@ -110,7 +162,7 @@ function startDrag(event, id) {
     moved = true;
     const point = new DOMPoint(moveEvent.clientX, moveEvent.clientY).matrixTransform(matrix.inverse());
     state.layout[key] ||= { schemaVersion: "1.0.0", positions: {} };
-    state.layout[key].positions[id] = { x: point.x, y: point.y, pinned: true };
+    state.layout[key].positions = { ...state.layout[key].positions, [id]: { x: initial.x + point.x - start.x, y: initial.y + point.y - start.y, pinned: true } };
     renderGraph();
   };
   const end = (endEvent) => {
@@ -118,6 +170,7 @@ function startDrag(event, id) {
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", end);
     window.removeEventListener("pointercancel", end);
+    state.dragging = null;
     if (endEvent.type === "pointercancel") {
       if (moved) state.layout = before.layout;
       renderGraph();
@@ -136,6 +189,7 @@ function startDrag(event, id) {
 
 function selectNode(id) {
   if (!nodeById(id) || (id !== state.selectedId && !discardDraft())) return;
+  pages.show("model");
   state.selectedId = id;
   state.context = null;
   render();
@@ -170,14 +224,16 @@ async function refreshContext() {
 }
 
 function navigateUI(patch) {
+  if (state.dragging) return false;
   const nextId = Object.hasOwn(patch, "selectedId") ? patch.selectedId : state.selectedId;
   if (nextId !== state.selectedId && !discardDraft()) return false;
-  if (!navigate(state, patch)) return false;
+  if (!navigate(state, patch)) { pages.show("model"); return true; }
   afterNavigation();
   return true;
 }
 
 function afterNavigation() {
+  pages.show("model");
   if (!selectedNode()) state.selectedId = null;
   state.context = null;
   $("search").value = state.search;
@@ -221,7 +277,7 @@ async function renderAgentDrawer() {
 async function renderDrawerOriginal(content, generation) {
   if (state.drawer === "context") { content.innerHTML = `<div class="drawer-card"><strong>Current scope</strong>${escapeHtml(state.scope.title)}<br>Depth ${state.scope.depth}</div><div class="drawer-card"><strong>Editing model</strong>Changes are direct, traceable and undoable.</div><div class="drawer-card"><strong>Agent context</strong>Markdown is generated from the canonical JSON graph for the current project and focus.</div>`; return; }
   if (state.drawer === "compare") { try { state.compare = await request("/api/compare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base: state.baseline, candidate: state.graph }) }); if (generation !== state.drawerRequest || !state.drawerOpen || state.drawer !== "compare") return; const c = state.compare; content.innerHTML = `<div class="drawer-card"><strong>Changes</strong>${c.nodesAdded.length} added · ${c.nodesRemoved.length} removed · ${c.nodesChanged.length} changed nodes</div><div class="drawer-card"><strong>Relationships</strong>${c.edgesAdded.length} added · ${c.edgesRemoved.length} removed</div>`; } catch (error) { if (generation === state.drawerRequest) content.textContent = error.message; } return; }
-  if (state.drawer === "library") { const cards = [...state.library.patterns.map((item) => ({ ...item, kind: "Pattern" })), ...state.library.templates.map((item) => ({ ...item, kind: "Template" }))]; content.innerHTML = cards.length ? cards.map((item) => `<div class="drawer-card"><strong>${escapeHtml(item.kind)} · ${escapeHtml(item.title)}</strong>${escapeHtml(item.problem || item.target || "Reusable knowledge for the current scope.")}<br><button type="button" data-library="${escapeHtml(item.id)}">Preview in scope</button></div>`).join("") : `<span class="muted">Library is empty.</span>`; document.querySelectorAll("[data-library]").forEach((button) => button.addEventListener("click", () => toast(`Preview ${button.dataset.library} for ${state.scope.title}`))); return; }
+  if (state.drawer === "library") { const cards = [...state.library.patterns.map((item) => ({ ...item, kind: "Pattern" })), ...state.library.templates.map((item) => ({ ...item, kind: "Template" }))]; content.innerHTML = cards.length ? cards.map((item) => `<div class="drawer-card"><strong>${escapeHtml(item.kind)} · ${escapeHtml(item.title)}</strong>${escapeHtml(item.problem || item.target || "Reusable knowledge for the current scope.")}<br><button type="button" data-library="${escapeHtml(item.id)}">Preview in scope</button></div>`).join("") : `<span class="muted">Library is empty.</span>`; document.querySelectorAll("[data-library]").forEach((button) => button.addEventListener("click", () => pages.openItem([...state.library.patterns.map((item, index) => ({ id: item.id, key: `pattern-${index}` })), ...state.library.templates.map((item, index) => ({ id: item.id, key: `template-${index}` }))].find(item => item.id === button.dataset.library)?.key, button))); return; }
   const tour = state.tour?.tour || state.tours[0]; if (!tour) { content.innerHTML = `<span class="muted">No guided tours configured.</span>`; return; } if (!state.tour) content.innerHTML = `<div class="drawer-card"><strong>${escapeHtml(tour.title)}</strong>${tour.steps.length} semantic steps<br><button id="start-tour" type="button">Start tour</button></div>`; else content.innerHTML = `<div class="drawer-card"><strong>${escapeHtml(tour.title)}</strong>Step ${state.tour.index + 1} of ${tour.steps.length}<br>${escapeHtml(tour.steps[state.tour.index].explanation)}<br><button id="tour-back" type="button" ${state.tour.index === 0 ? "disabled" : ""}>Back</button> <button id="tour-next" type="button">${state.tour.index === tour.steps.length - 1 ? "Finish" : "Next"}</button></div>`; $("start-tour")?.addEventListener("click", () => startTour(tour)); $("tour-back")?.addEventListener("click", () => { state.tour.index -= 1; showTourStep(); }); $("tour-next")?.addEventListener("click", () => { if (state.tour.index >= tour.steps.length - 1) { state.tour = null; render(); toast("Tour complete"); } else { state.tour.index += 1; showTourStep(); } });
 }
 async function previewProposal(id) { try { const result = await request(`/api/proposals/${encodeURIComponent(id)}/preview`, { method: "POST" }); const target = $(`proposal-detail-${id}`); if (target) target.innerHTML = `<p><strong>Preview</strong> ${result.diff.nodesAdded.length} added · ${result.diff.nodesChanged.length} changed · ${result.diff.edgesAdded.length} relationships</p><p>${result.canApply ? "Ready for human approval." : "Cannot apply: stale or invalid."}</p>${result.diagnostics.length ? `<p class="muted">${result.diagnostics.map((item) => escapeHtml(item.message)).join("<br>")}</p>` : ""}`; } catch (error) { toast(error.message); } }
@@ -290,6 +346,7 @@ function render() {
   document.querySelectorAll("#node-form input, #node-form select, #node-form textarea, #node-form button, #add-node, #add-edge, #context-refresh").forEach((element) => { element.disabled = state.busy; });
   setStatus(state.dirty ? "Unsaved changes" : "Ready");
   renderAgentDrawer();
+  pages.render();
 }
 
 function renderScopeStatus() {
@@ -313,6 +370,7 @@ function renderScopeStatus() {
 }
 
 function openDrawer(drawer) {
+  pages.show("model");
   state.drawer = drawer;
   state.drawerOpen = true;
   render();
@@ -324,7 +382,7 @@ $("redo-button").addEventListener("click", redo);
 $("back-button").addEventListener("click", () => travelUI("back"));
 $("forward-button").addEventListener("click", () => travelUI("forward"));
 window.addEventListener("keydown", (event) => {
-  if (event.target.closest?.("input, textarea, select, [contenteditable=true]")) return;
+  if (event.isComposing || document.querySelector("dialog[open]") || event.target.closest?.("input, textarea, select, [contenteditable=true]")) return;
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
     event.preventDefault();
     event.shiftKey ? redo() : undo();
@@ -349,7 +407,7 @@ document.querySelectorAll("[data-tool]").forEach((button) => button.addEventList
   switch (button.dataset.tool) {
     case "all": allModels(); break;
     case "decisions": navigateUI({ scope: projectScope(), view: "decisions", search: "" }); break;
-    case "library": openDrawer("library"); break;
+    case "library": pages.show("library"); break;
     case "review": openDrawer("proposals"); break;
   }
 }));
@@ -401,6 +459,7 @@ $("add-node").addEventListener("click", () => {
   if (state.busy || !discardDraft()) return;
   const root = state.scope.rootIds.map(nodeById).find(Boolean);
   if (state.scope.id !== "project" && !root) return toast("Choose an existing focus object or open All models first.");
+  pages.show("model");
   const title = prompt("Object title", "New product concept")?.trim();
   if (!title) return;
   const region = regions.includes(state.view) ? state.view : state.view === "verification" ? "quality" : state.view === "decisions" ? "decision" : "product";
@@ -427,6 +486,58 @@ $("add-edge").addEventListener("click", () => {
   const kind = prompt("Relationship kind", "relates-to")?.trim();
   if (!kind) return;
   commit(() => state.graph.edges.push({ id: `edge:${crypto.randomUUID()}`, kind, from: node.id, to: target }));
+});
+
+const pages = createStudioPages({
+  state,
+  focus: area => setScope({ id: area.id, title: area.title, rootIds: area.rootIds, depth: area.depth }),
+  inspect: selectNode,
+  lens: view => navigateUI({ scope: projectScope(), view, search: "" }),
+  model: allModels,
+  review: () => openDrawer("compare"),
+});
+initAppearance();
+$("lens-list").addEventListener("keydown", event => navigateChoices(event, "[data-lens]"));
+document.querySelector(".page-nav").addEventListener("keydown", event => navigateChoices(event, "[data-page]"));
+$("fit-view").addEventListener("click", () => { if (!state.graph) return; cameras.delete(scopeKey()); renderGraph(); });
+for (const [id, factor] of [["zoom-in", .8], ["zoom-out", 1.25]]) $(id).addEventListener("click", () => {
+  if (!cameras.has(scopeKey())) return;
+  cameras.set(scopeKey(), zoomCamera(cameras.get(scopeKey()), factor)); renderGraph();
+});
+$("auto-layout").addEventListener("click", () => {
+  if (!state.graph || state.busy || state.dragging) return;
+  const projection = projectView(state.graph, state);
+  const arranged = arrangeGraph(projection.nodes, projection.edges, {
+    mode: ["workflow", "architecture"].includes(state.view) ? "layered" : "grid",
+    positions: state.layout[scopeKey()]?.positions || {},
+  });
+  if (commit(() => {
+    state.layout[scopeKey()] ||= { schemaVersion: "1.0.0", positions: {} };
+    state.layout[scopeKey()].positions = { ...state.layout[scopeKey()].positions, ...arranged };
+  })) { cameras.delete(scopeKey()); renderGraph(); toast("Visible layout arranged; pinned objects preserved."); }
+});
+$("unpin-selection").addEventListener("click", () => {
+  const position = state.layout[scopeKey()]?.positions?.[state.selectedId];
+  if (position?.pinned) commit(() => { position.pinned = false; });
+});
+$("graph-svg").addEventListener("pointerdown", event => {
+  if (event.button !== 0 || event.target.closest("[data-graph-node]")) return;
+  const key = scopeKey(), svg = $("graph-svg"), matrix = svg.getScreenCTM();
+  if (!matrix || !cameras.has(key)) return;
+  const inverse = matrix.inverse(), origin = new DOMPoint(event.clientX, event.clientY).matrixTransform(inverse);
+  const before = { ...cameras.get(key) };
+  const move = e => {
+    if (e.pointerId !== event.pointerId) return;
+    const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(inverse);
+    cameras.set(key, { ...before, x: before.x - point.x + origin.x, y: before.y - point.y + origin.y });
+    renderGraph();
+  };
+  const stop = e => {
+    if (e.pointerId !== event.pointerId) return;
+    window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); window.removeEventListener("pointercancel", stop);
+    if (e.type === "pointercancel") { cameras.set(key, before); renderGraph(); }
+  };
+  window.addEventListener("pointermove", move); window.addEventListener("pointerup", stop); window.addEventListener("pointercancel", stop);
 });
 
 async function boot() { try { const response = await request("/api/workspace"); state.graph = response.graph; state.baseline = clone(response.baseline || response.graph); state.layout = response.layout || {}; state.focusAreas = response.focusAreas || []; state.tours = response.tours || []; state.library = response.library || { patterns: [], templates: [] }; state.diagnostics = response.diagnostics || []; try { await refreshProposals(); } catch (error) { toast(`Proposals unavailable: ${error.message}`); } $("project-name").textContent = state.graph.manifest.name; render(); } catch (error) { $("project-name").textContent = "Unable to load project"; toast(error.message); } }
