@@ -6,11 +6,14 @@ import { createProjectClient } from "./project-client.js";
 import { initProjectSession } from "./project-session.js";
 import { initDocumentBrowser } from "./document-browser.js";
 import { initVisualAuthoring } from "./visual-authoring.js";
+import { initStudioExperience } from "./studio-experience.js";
+import { showObjectDialog, showRelationshipDialog } from "./object-dialogs.js";
+import { cardTitle, planObject, planRelationship, workingChanges } from "./studio-presentation.js";
 
 const VIEWS = ["overview", "product", "business", "workflow", "domain", "experience", "architecture", "verification", "decisions", "impact"];
 const labels = { overview: "Overview", product: "Product", business: "Business", workflow: "Workflow", domain: "Domain", experience: "Experience", architecture: "Architecture", verification: "Verification", decisions: "Decisions", impact: "Related impact" };
 const regions = ["intent", "product", "business", "workflow", "domain", "experience", "architecture", "decision", "quality"];
-const colors = { intent: "#f4bc7a", product: "#75e0c2", business: "#ef9bca", workflow: "#e6b86a", domain: "#81c8ff", experience: "#90d7bb", architecture: "#bd9aff", decision: "#ff8d8d", quality: "#b8c8ff" };
+const colors = { intent: "#aa8039", product: "#b25c40", business: "#94758d", workflow: "#b8954e", domain: "#65937a", experience: "#9c80a8", architecture: "#7193ab", decision: "#a76b5d", quality: "#897bad" };
 const state = { graph: null, baseline: null, diagnostics: [], focusAreas: [], tours: [], library: { patterns: [], templates: [] }, proposals: [], scope: projectScope(), view: "overview", search: "", selectedId: null, context: null, compare: null, drawer: "context", dirty: false, history: [], future: [], layout: {}, scopeBack: [], scopeForward: [], tour: null, dragging: null, drawerOpen: false, busy: false, formId: null, formDirty: false, contextRequest: 0, contextError: "", drawerRequest: 0 };
 const $ = (id) => document.getElementById(id);
 
@@ -72,11 +75,15 @@ function markDirty() {
 function setStatus(text, dirty = state.dirty) {
   $("save-state").textContent = state.busy ? "Saving…" : dirty ? "Unsaved changes" : state.formDirty ? "Object draft" : text;
   $("save-state").style.color = dirty || state.formDirty ? "var(--warning)" : "";
-  $("save-button").disabled = state.busy;
+  $("save-button").disabled = state.busy || !state.graph;
   $("undo-button").disabled = state.busy || !state.history.length;
   $("redo-button").disabled = state.busy || !state.future.length;
   $("back-button").disabled = !state.scopeBack.length;
   $("forward-button").disabled = !state.scopeForward.length;
+  $("inspector-draft-status").textContent = state.formDirty
+    ? "Unapplied edits. Apply them to the working model, then Save model."
+    : "Apply updates the working model. Save writes it to your files.";
+  $("inspector-draft-status").dataset.dirty = String(state.formDirty);
 }
 
 function toast(message) { const node = $("toast"); node.textContent = message; node.classList.add("show"); setTimeout(() => node.classList.remove("show"), 2300); }
@@ -90,7 +97,7 @@ function renderFocusAreas() {
     const area = state.focusAreas.find((item) => item.id === button.dataset.focus);
     if (area) setScope({ id: area.id, title: area.title, rootIds: area.rootIds, depth: area.depth });
   }));
-  $("node-count").textContent = `${state.graph.nodes.length} nodes`;
+  $("node-count").textContent = `${state.graph.nodes.length} objects`;
 }
 
 function renderLenses() {
@@ -133,7 +140,8 @@ function renderGraph() {
   }).join("");
   svg.innerHTML = `<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="edge-arrow" d="M 0 0 L 10 5 L 0 10 z"/></marker></defs>` + edges + nodes.map(node => {
     const p = positions[node.id];
-    return `<g class="graph-node ${node.id === state.selectedId ? "selected" : ""}" data-graph-node="${escapeHtml(node.id)}" transform="translate(${p.x - CARD.width / 2},${p.y - CARD.height / 2})" tabindex="0" role="button" aria-label="${escapeHtml(node.title)}, ${escapeHtml(regionOf(node))} node" aria-pressed="${node.id === state.selectedId}"><title>${escapeHtml(node.title)} · ${escapeHtml(node.id)}</title><rect class="node-card" width="${CARD.width}" height="${CARD.height}" rx="5"/><line class="node-accent accent-${escapeHtml(regionOf(node))}" x1="1" y1="14" x2="1" y2="74"/><text class="node-type" x="17" y="22">${escapeHtml(regionOf(node).toUpperCase())}</text><text class="node-title" x="17" y="47">${escapeHtml(trim(node.title, 24))}</text><text class="node-type" x="17" y="68">${escapeHtml(trim(node.type, 26))}</text>${p.pinned ? '<text class="node-pin" x="180" y="22">PIN</text>' : ''}</g>`;
+    const titleLines = cardTitle(node.title);
+    return `<g class="graph-node ${node.id === state.selectedId ? "selected" : ""}" data-graph-node="${escapeHtml(node.id)}" transform="translate(${p.x - CARD.width / 2},${p.y - CARD.height / 2})" tabindex="0" role="button" aria-label="${escapeHtml(node.title)}, ${escapeHtml(regionOf(node))} node" aria-pressed="${node.id === state.selectedId}"><title>${escapeHtml(node.title)} · ${escapeHtml(node.id)}</title><rect class="node-card" width="${CARD.width}" height="${CARD.height}" rx="9"/><line class="node-accent accent-${escapeHtml(regionOf(node))}" x1="1" y1="16" x2="1" y2="72"/><text class="node-type" x="16" y="20">${escapeHtml(trim(node.type.toUpperCase(), 27))}</text><text class="node-title" x="16" y="42">${titleLines.map((line, i) => `<tspan x="16" dy="${i ? 17 : 0}">${escapeHtml(line)}</tspan>`).join("")}</text><text class="node-status" x="16" y="78">${escapeHtml(node.status || "Not specified")}</text>${p.pinned ? '<text class="node-pin" x="188" y="20">PIN</text>' : ''}</g>`;
   }).join("");
   svg.querySelectorAll("[data-graph-node]").forEach(node => {
     node.addEventListener("click", () => selectNode(node.dataset.graphNode));
@@ -193,12 +201,13 @@ function startDrag(event, id) {
 }
 
 function selectNode(id) {
-  if (!nodeById(id) || (id !== state.selectedId && !discardDraft())) return;
+  if (!nodeById(id) || (id !== state.selectedId && !discardDraft())) return false;
   pages.show("model");
   state.selectedId = id;
   state.context = null;
   render();
   refreshContext();
+  return true;
 }
 
 function discardDraft() {
@@ -252,13 +261,43 @@ function travelUI(direction) {
   if (travel(state, direction)) afterNavigation();
 }
 
-function allModels() { navigateUI({ scope: projectScope(), search: "" }); }
+function allModels() { return navigateUI({ scope: projectScope(), search: "" }); }
 
 function setScope(scope, view = state.view) {
   return navigateUI({ scope, view, selectedId: scope.rootIds[0] || state.selectedId, search: "" });
 }
 
-function renderInspector() { const node = selectedNode(); const form = $("node-form"); $("inspector-empty").hidden = Boolean(node); form.hidden = !node; $("context-sections").hidden = !node; $("selection-type").textContent = node ? `${regionOf(node)} / ${node.type}` : "No selection"; if (!node) { state.formId = null; $("edge-list").textContent = "Select a node to see relationships."; return; } if (state.formId !== node.id) { state.formId = node.id; state.formDirty = false; $("node-title").value = node.title; $("node-id").value = node.id; $("node-type").value = node.type; $("node-status").value = node.status || ""; $("node-data").value = JSON.stringify(node.data || {}, null, 2); $("node-region").innerHTML = regions.map((region) => `<option value="${region}" ${regionOf(node) === region ? "selected" : ""}>${region}</option>`).join(""); } const edges = state.graph.edges.filter((edge) => edge.from === node.id || edge.to === node.id); $("edge-list").innerHTML = edges.length ? edges.map((edge) => `<div class="edge-item"><strong>${escapeHtml(edge.kind)}</strong><br>${escapeHtml(edge.from)} → ${escapeHtml(edge.to)}</div>`).join("") : `<span class="muted">No relationships yet.</span>`; const context = state.context; if (!context) { ["why-list", "where-list", "impact-list", "source-list"].forEach((id) => $(id).innerHTML = `<span class="muted">${escapeHtml(state.contextError || "Loading saved context…")}</span>`); return; } renderContextList("why-list", context.why, "No intent or rationale linked yet."); renderContextList("where-list", context.whereUsed, "No other usage found in this scope."); renderContextList("impact-list", context.impact, "No related objects found."); renderContextList("source-list", [...context.decisions, ...context.evidence], "No decisions or evidence linked yet."); }
+function renderInspector() {
+  const node = selectedNode(), form = $("node-form");
+  $("inspector-empty").hidden = Boolean(node); form.hidden = !node;
+  $("context-sections").hidden = !node;
+  $("selection-type").textContent = node ? `${regionOf(node)} / ${node.type}` : "No selection";
+  $("add-edge").disabled = !node || state.busy;
+  if (!node) { state.formId = null; $("edge-list").textContent = "Select an object to see relationships."; return; }
+  if (state.formId !== node.id) {
+    state.formId = node.id; state.formDirty = false;
+    $("node-title").value = node.title; $("node-id").value = node.id;
+    $("node-type").value = node.type; $("node-status").value = node.status || "";
+    $("node-data").value = JSON.stringify(node.data || {}, null, 2);
+    $("node-region").innerHTML = regions.map(region => `<option value="${region}" ${regionOf(node) === region ? "selected" : ""}>${region}</option>`).join("");
+  }
+  const edges = state.graph.edges.filter(edge => edge.from === node.id || edge.to === node.id);
+  $("edge-list").innerHTML = edges.length ? edges.map(edge => {
+    const otherId = edge.from === node.id ? edge.to : edge.from;
+    const other = nodeById(otherId);
+    return `<div class="edge-item"><strong>${escapeHtml(edge.kind)}</strong><br><button class="text-button" data-related-object="${escapeHtml(otherId)}" title="Inspect without changing focus">${edge.from === node.id ? "→" : "←"} ${escapeHtml(other?.title || otherId)}</button></div>`;
+  }).join("") : '<span class="muted">No relationships yet. Connect this object to give it context.</span>';
+  $("edge-list").querySelectorAll('[data-related-object]').forEach(b => b.onclick = () => selectNode(b.dataset.relatedObject));
+  const context = state.context;
+  if (!context) {
+    ["why-list", "where-list", "impact-list", "source-list"].forEach(id => $(id).innerHTML = `<span class="muted">${escapeHtml(state.contextError || "Loading saved context…")}</span>`);
+    return;
+  }
+  renderContextList("why-list", context.why, "No intent or rationale linked yet.");
+  renderContextList("where-list", context.whereUsed, "No other usage found in this scope.");
+  renderContextList("impact-list", context.impact, "No related objects found.");
+  renderContextList("source-list", [...context.decisions, ...context.evidence], "No decisions or evidence linked yet.");
+}
 function renderContextList(id, items, empty) { $(id).innerHTML = items.length ? items.slice(0, 8).map((item) => `<div class="context-item"><button data-node="${escapeHtml(item.id)}" type="button"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(regionOf(item))} · ${escapeHtml(item.type)}</span></button></div>`).join("") : `<span class="muted">${empty}</span>`; document.querySelectorAll(`#${id} [data-node]`).forEach((button) => button.addEventListener("click", () => selectNode(button.dataset.node))); }
 function renderValidation() { const diagnostics = state.diagnostics || []; $("validation-count").textContent = `${diagnostics.length} issue${diagnostics.length === 1 ? "" : "s"}`; $("validation-list").innerHTML = diagnostics.length ? diagnostics.slice(0, 8).map((item) => `<div class="edge-item"><strong>${escapeHtml(item.code || item.level)}</strong><br>${escapeHtml(item.message)}</div>`).join("") : `<span class="muted">No issues in the last saved validation.</span>`; }
 
@@ -281,7 +320,11 @@ async function renderAgentDrawer() {
 }
 async function renderDrawerOriginal(content, generation) {
   if (state.drawer === "context") { content.innerHTML = `<div class="drawer-card"><strong>Current scope</strong>${escapeHtml(state.scope.title)}<br>Depth ${state.scope.depth}</div><div class="drawer-card"><strong>Editing model</strong>Changes are direct, traceable and undoable.</div><div class="drawer-card"><strong>Agent context</strong>Markdown is generated from the canonical JSON graph for the current project and focus.</div>`; return; }
-  if (state.drawer === "compare") { try { state.compare = await request("/api/compare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base: state.baseline, candidate: state.graph }) }); if (generation !== state.drawerRequest || !state.drawerOpen || state.drawer !== "compare") return; const c = state.compare; content.innerHTML = `<div class="drawer-card"><strong>Changes</strong>${c.nodesAdded.length} added · ${c.nodesRemoved.length} removed · ${c.nodesChanged.length} changed nodes</div><div class="drawer-card"><strong>Relationships</strong>${c.edgesAdded.length} added · ${c.edgesRemoved.length} removed</div>`; } catch (error) { if (generation === state.drawerRequest) content.textContent = error.message; } return; }
+  if (state.drawer === "compare") {
+    const changes = workingChanges(state.baseline, state.graph);
+    content.innerHTML = `<section class="working-diff"><header><h3>${changes.length ? `${changes.length} product changes` : "No product changes"}</h3><p>Compared with the last loaded or saved model. Layout changes may still need saving.</p></header>${changes.map(change => `<details class="diff-item"><summary><span class="change-kind ${change.kind}">${change.kind}</span><strong>${escapeHtml(change.after?.title || change.before?.title || change.id)}</strong><span>${change.category}</span></summary><pre>${escapeHtml(JSON.stringify({ before: change.before, after: change.after }, null, 2))}</pre></details>`).join("")}</section>`;
+    return;
+  }
   if (state.drawer === "library") { const cards = [...state.library.patterns.map((item) => ({ ...item, kind: "Pattern" })), ...state.library.templates.map((item) => ({ ...item, kind: "Template" }))]; content.innerHTML = cards.length ? cards.map((item) => `<div class="drawer-card"><strong>${escapeHtml(item.kind)} · ${escapeHtml(item.title)}</strong>${escapeHtml(item.problem || item.target || "Reusable knowledge for the current scope.")}<br><button type="button" data-library="${escapeHtml(item.id)}">Preview in scope</button></div>`).join("") : `<span class="muted">Library is empty.</span>`; document.querySelectorAll("[data-library]").forEach((button) => button.addEventListener("click", () => pages.openItem([...state.library.patterns.map((item, index) => ({ id: item.id, key: `pattern-${index}` })), ...state.library.templates.map((item, index) => ({ id: item.id, key: `template-${index}` }))].find(item => item.id === button.dataset.library)?.key, button))); return; }
   const tour = state.tour?.tour || state.tours[0]; if (!tour) { content.innerHTML = `<span class="muted">No guided tours configured.</span>`; return; } if (!state.tour) content.innerHTML = `<div class="drawer-card"><strong>${escapeHtml(tour.title)}</strong>${tour.steps.length} semantic steps<br><button id="start-tour" type="button">Start tour</button></div>`; else content.innerHTML = `<div class="drawer-card"><strong>${escapeHtml(tour.title)}</strong>Step ${state.tour.index + 1} of ${tour.steps.length}<br>${escapeHtml(tour.steps[state.tour.index].explanation)}<br><button id="tour-back" type="button" ${state.tour.index === 0 ? "disabled" : ""}>Back</button> <button id="tour-next" type="button">${state.tour.index === tour.steps.length - 1 ? "Finish" : "Next"}</button></div>`; $("start-tour")?.addEventListener("click", () => startTour(tour)); $("tour-back")?.addEventListener("click", () => { state.tour.index -= 1; showTourStep(); }); $("tour-next")?.addEventListener("click", () => { if (state.tour.index >= state.tour.tour.steps.length - 1) { state.tour = null; render(); toast("Tour complete"); } else { state.tour.index += 1; showTourStep(); } });
 }
@@ -351,9 +394,12 @@ function render() {
     button.classList.toggle("active", tool === "all" ? state.scope.id === "project" && state.view !== "decisions" : tool === "decisions" ? state.view === "decisions" : state.drawerOpen && state.drawer === (tool === "review" ? "proposals" : tool));
   });
   document.querySelectorAll("#node-form input, #node-form select, #node-form textarea, #node-form button, #add-node, #add-edge, #context-refresh").forEach((element) => { element.disabled = state.busy; });
+  $("add-edge").disabled = state.busy || !selectedNode();
+  $("add-edge").disabled = state.busy || !selectedNode();
   setStatus(state.dirty ? "Unsaved changes" : "Ready");
   renderAgentDrawer();
   pages.render();
+  experience.refresh();
 }
 
 function renderScopeStatus() {
@@ -369,7 +415,7 @@ function renderScopeStatus() {
   $("selection-visibility").textContent = messages[projection.selectionVisibility] || "";
   $("selection-visibility").hidden = !messages[projection.selectionVisibility];
   $("isolate-button").disabled = !selectedNode();
-  $("expand-button").disabled = state.scope.id === "project" || state.scope.depth >= 8 || !state.scope.rootIds.length;
+  $("expand-button").disabled = state.busy || state.scope.id === "project" || state.scope.depth >= 8 || !state.scope.rootIds.length;
   const empty = $("empty-state");
   empty.querySelector("h2").textContent = projection.missingRoots.length ? "Focus object is missing" : state.search.trim() ? "No matching objects" : "Nothing defined in this lens";
   empty.querySelector("p").textContent = projection.missingRoots.length ? "Open All models or go Back. The rest of the graph has not been deleted." : projection.hiddenByLens || projection.hiddenBySearch ? "Change lens or clear search. Hidden objects remain in the same model." : "Create a node or link an existing model into this focus.";
@@ -423,9 +469,17 @@ $("focus-here-button").addEventListener("click", () => {
   if (node) setScope({ id: `focus:${node.id}`, title: node.title, rootIds: [node.id], depth: 2 });
 });
 $("context-refresh").addEventListener("click", refreshContext);
+function showSaveFeedback(message) {
+  $("save-feedback-text").textContent = message;
+  $("save-feedback").hidden = false;
+}
 async function saveWorkspace() {
   if (state.busy || state.dragging || !state.graph) return false;
-  if (state.formDirty) { toast("Apply object changes before saving the model."); return false; }
+  if (state.formDirty) {
+    showSaveFeedback("You have unapplied object edits. Apply object changes in the inspector before saving the model.");
+    $("node-form").scrollIntoView({ block: "nearest" });
+    return false;
+  }
   const submitted = snapshot();
   state.busy = true;
   render();
@@ -434,9 +488,10 @@ async function saveWorkspace() {
     state.baseline = clone(submitted.graph);
     state.diagnostics = response.diagnostics || [];
     state.dirty = false;
+    $("save-feedback").hidden = true;
     toast("Product model saved");
     return true;
-  } catch (error) { toast(error.message); return false; }
+  } catch (error) { showSaveFeedback(`Not saved. ${error.message} Your working edits are still here.`); return false; }
   finally { state.busy = false; render(); refreshContext(); }
 }
 $("save-button").addEventListener("click", saveWorkspace);
@@ -464,37 +519,33 @@ $("delete-node").addEventListener("click", () => {
     state.selectedId = null;
   });
 });
-$("add-node").addEventListener("click", () => {
-  if (state.busy || !discardDraft()) return;
-  const root = state.scope.rootIds.map(nodeById).find(Boolean);
-  if (state.scope.id !== "project" && !root) return toast("Choose an existing focus object or open All models first.");
-  pages.show("model");
-  const title = prompt("Object title", "New product concept")?.trim();
-  if (!title) return;
-  const region = regions.includes(state.view) ? state.view : state.view === "verification" ? "quality" : state.view === "decisions" ? "decision" : "product";
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || crypto.randomUUID();
-  const node = { id: `${region}:${slug}`, type: region === "domain" ? "concept" : region, region, title, status: "draft", data: {} };
-  if (nodeById(node.id)) return toast("An object with this ID already exists");
-  // The user chooses the relationship; never invent an edge just to make a node visible.
-  const kind = root ? prompt(`Relationship from ${root.title} to ${title}`, "relates-to")?.trim() : null;
-  if (root && !kind) return;
-  commit(() => {
-    state.graph.nodes.push(node);
-    if (root) state.graph.edges.push({ id: `edge:${crypto.randomUUID()}`, kind, from: root.id, to: node.id });
-    state.selectedId = node.id;
-  });
-  if (root && state.scope.depth === 0) navigateUI({ scope: { ...state.scope, depth: 1 }, search: "" });
-  else { state.search = ""; $("search").value = ""; render(); }
-});
+function addObject() {
+  if (!state.graph || state.busy || state.dragging) return false;
+  const rootId = state.scope.id === "project" ? null : state.scope.rootIds[0];
+  if (state.scope.id !== "project" && !nodeById(rootId)) { toast("Open All models or choose an existing focus before adding an object."); return false; }
+  const defaultKind = { workflow: "step", domain: "entity", experience: "screen", decisions: "decision", verification: "criterion" }[state.view] || "feature";
+  return showObjectDialog({ graph: state.graph, rootId, defaultKind, opener: $("add-node").getClientRects().length ? $("add-node") : $("canvas-focus"), apply: input => {
+    if (state.busy || state.dragging) return false;
+    const plan = planObject(state.graph, input, crypto.randomUUID());
+    if (!commit(() => {
+      state.graph.nodes.push(plan.node);
+      if (plan.edge) state.graph.edges.push(plan.edge);
+      state.selectedId = plan.node.id;
+    })) return false;
+    navigateUI({ view: "overview", search: "", selectedId: plan.node.id,
+      scope: state.scope.id !== "project" && state.scope.depth === 0 ? { ...state.scope, depth: 1 } : state.scope });
+    toast("Object added as draft. Save the model to persist it.");
+    return true;
+  } });
+}
+$("add-node").addEventListener("click", addObject);
 $("add-edge").addEventListener("click", () => {
-  const node = selectedNode();
-  if (!node || state.busy || !discardDraft()) return;
-  const target = prompt("Target object ID", state.graph.nodes.find((item) => item.id !== node.id)?.id || "");
-  if (target === null) return;
-  if (!nodeById(target)) return toast("Target object was not found");
-  const kind = prompt("Relationship kind", "relates-to")?.trim();
-  if (!kind) return;
-  commit(() => state.graph.edges.push({ id: `edge:${crypto.randomUUID()}`, kind, from: node.id, to: target }));
+  if (!state.graph || !selectedNode() || state.busy || state.dragging) return;
+  showRelationshipDialog({ graph: state.graph, fromId: state.selectedId, opener: $("add-edge"), apply: input => {
+    if (state.busy || state.dragging) return false;
+    const edge = planRelationship(state.graph, input, `edge:${crypto.randomUUID()}`);
+    return commit(() => state.graph.edges.push(edge));
+  } });
 });
 
 const pages = createStudioPages({
@@ -505,6 +556,10 @@ const pages = createStudioPages({
   model: allModels,
   review: () => openDrawer("compare"),
 });
+const experience = initStudioExperience({ state, showPage: page => pages.show(page), inspect: selectNode,
+  focus: area => setScope({ id: area.id, title: area.title, rootIds: area.rootIds, depth: area.depth }),
+  addObject, openProposals: () => openDrawer("proposals") });
+document.addEventListener('studio:page', () => experience.refresh());
 initAppearance();
 initDocumentBrowser({ request, graph: () => state.graph, isDirty: () => state.dirty, selection: () => state.selectedId, inspect: selectNode });
 initVisualAuthoring({

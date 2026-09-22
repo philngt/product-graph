@@ -77,7 +77,8 @@ async function browserChecks() {
     const saved=await(await fetch('/__qa')).json();
     check(saved.savedNodes===6&&saved.savedTitle==='Recommend draft','Save writes the whole edited graph, not just the visible projection');
     check(q('#save-state').textContent==='Ready','Successful save clears dirty state');
-    const answers=['Exception path','contains']; window.prompt=()=>answers.shift()??null; click('#add-node');
+    click('#add-node'); input('#new-object-title','Exception path');
+    q('#new-object-relation').value='contains'; q('#object-create-form').requestSubmit();
     check(q('#node-title').value==='Exception path'&&nodes()>=2,'Add to focus connects the new object and reveals it');
     click('#undo-button'); check(![...document.querySelectorAll('.node-title')].some(el=>el.textContent==='Exception path'),'Undo removes the added object and relationship together');
     click('#redo-button'); check([...document.querySelectorAll('.node-title')].some(el=>el.textContent==='Exception path'),'Redo restores the creation');
@@ -86,7 +87,7 @@ async function browserChecks() {
     window.confirm=()=>true; click('#delete-node'); check(nodes()===0&&q('#empty-state h2').textContent==='Focus object is missing','Deleting focus root does not silently reveal all models');
     click('#all-models-button'); check(nodes()===6,'Rest of graph remains accessible after deleting focus root');
     click('[data-drawer="compare"]'); click('[data-drawer="library"]'); await sleep(300);
-    check(q('#drawer-content').textContent.includes('Library is empty'),'Late compare result cannot overwrite Library');
+    check(q('#drawer-content').textContent.includes('Library is empty'),'Leaving working changes does not overwrite the Library drawer');
     document.documentElement.dataset.studioSmoke='passed';
   } catch(error) { document.documentElement.dataset.studioSmoke='failed'; checks.push(`FAIL: ${error.stack||error.message}`); }
   const report=document.createElement('pre'); report.id='studio-smoke-result'; report.textContent=JSON.stringify(checks); document.body.append(report);
