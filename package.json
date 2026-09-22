@@ -20,7 +20,10 @@
     "test:workspace:live": "node --experimental-strip-types --test tests/projects-live-browser.test.mjs",
     "context:task": "node --experimental-strip-types src/task-context-cli.ts",
     "test:authoring": "node --experimental-strip-types --test tests/visual-authoring.test.ts tests/task-context.test.ts tests/authoring-http.test.ts",
-    "test:authoring:browser": "node --experimental-strip-types --test tests/authoring-browser.test.mjs"
+    "test:authoring:browser": "node --experimental-strip-types --test tests/authoring-browser.test.mjs",
+    "context:target": "node --experimental-strip-types src/implementation-context-cli.ts",
+    "test:targets": "node --experimental-strip-types --test tests/implementation-targets.test.ts tests/implementation-context.test.ts",
+    "test:targets:browser": "node --experimental-strip-types --test tests/implementation-targets-browser.test.mjs"
   },
   "engines": {
     "node": ">=22"
