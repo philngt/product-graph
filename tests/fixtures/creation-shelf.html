@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Creation interaction fixture</title>
+<style>
+:root { --paper:#faf8f4;--surface:#f1eee8;--node:#fffdf9;--line:#d8d1c8;--ink:#302d28;--muted:#655f56;--accent:#89502f;--accent-wash:#f6e9dc;--frame:#a59b8e;--display:Georgia,serif;--danger:#af3227; }
+:root[data-theme=dark] { --paper:#242622;--surface:#1d1f1c;--node:#2b2e28;--line:#494c44;--ink:#f2eee5;--muted:#bdbbae;--accent:#e6b88e;--accent-wash:#41382e;--frame:#777e70;--danger:#ff9e91; }
+* { box-sizing:border-box; } body { height:100vh; display:flex; flex-direction:column; overflow:hidden; margin:0; font:14px system-ui,sans-serif; background:var(--paper);color:var(--ink); }
+.fixture-banner { padding:12px 20px; background:var(--surface); border-bottom:1px solid var(--line); font-size:12px; }
+h1 { margin:18px 24px 2px; font:32px Georgia,serif; } .subtitle { margin:4px 24px 16px;color:var(--muted); }
+#graph-canvas { flex:1; min-height:120px; background-image:radial-gradient(var(--line) 1px,transparent 1px); background-size:22px 22px; overflow:hidden; }
+.fixture-banner,.direct-toolbar,.direct-hint {flex-shrink:0;}
+#graph-svg { width:100%;height:100%;touch-action:none;display:block; }
+.node-card { fill:var(--node);stroke:var(--frame);stroke-width:1; } .node-title {fill:var(--ink);font:600 15px system-ui;} .node-type {fill:var(--muted);font:11px system-ui;}
+.button {border:1px solid var(--line);padding:8px 12px;background:var(--surface);color:var(--ink);border-radius:5px;cursor:pointer;} .button-primary {background:var(--accent);color:var(--paper);}
+.fixture-controls {flex-shrink:0;display:flex;gap:8px;padding:10px 24px;flex-wrap:wrap;} #fixture-status {color:var(--muted);font-size:11px;padding:5px 24px;}
+</style>
+<div class="fixture-banner">Creation interaction fixture · Production creation modules, in-memory host · Not full Studio / server verification</div>
+<h1>Define your product.</h1><p class="subtitle">Explore ideas. Give them meaning. Keep every change reviewable.</p>
+<div id="graph-canvas" tabindex="0" aria-label="Model canvas"><svg id="graph-svg" viewBox="0 0 1200 680" aria-label="Product model"></svg></div>
+<div class="fixture-controls"><button id="undo" class="button">Undo</button><button id="redo" class="button">Redo</button><button id="save" class="button">Save fixture</button><button id="theme" class="button">Paper / Dark</button></div><div id="fixture-status" role="status"></div>
+<script type="module">
+import { createDirectCanvas } from '/ui/direct-canvas.js';
+import { prepareCanvasEdit, nearbyPosition } from '/ui/canvas-edit-model.js';
+import { CARD } from '/ui/canvas-layout.js';
+const seed = {nodes:[
+ {id:'feature:catalog',title:'Collection',type:'feature',region:'product',status:'draft',data:{retained:true},document:'doc:brief'},
+ {id:'entity:bottle',title:'Bottle',type:'entity',region:'domain',status:'draft',data:{}}
+],edges:[],documents:[{id:'doc:brief',path:'documents/brief.md'}]};
+const state = {graph:structuredClone(seed),scope:{id:'project',rootIds:[],depth:2},view:'overview',busy:false,dragging:null,formDirty:false,selectedId:'feature:catalog'};
+let positions = {'feature:catalog':{x:600,y:160,pinned:false},'entity:bottle':{x:920,y:160,pinned:true}}, history=[],future=[],saved=null,sequence=0;
+const svg=document.querySelector('#graph-svg'),surface=document.querySelector('#graph-canvas'),NS='http://www.w3.org/2000/svg';
+const notify = text=>{document.querySelector('#fixture-status').textContent=text;};
+const snapshot=()=>structuredClone({graph:state.graph,positions});
+function restore(value){state.graph=structuredClone(value.graph);positions=structuredClone(value.positions);render();}
+function perform(edit,point){
+ if(state.busy||state.dragging||state.formDirty)return false;
+ const plan=prepareCanvasEdit(state.graph,edit,()=>`fixture-${++sequence}`);if(!plan.changed)return true;
+ const p=plan.createdId?nearbyPosition(point,positions,CARD):null;
+ history.push(snapshot());future=[];state.graph=plan.graph;state.selectedId=plan.selectedId;
+ if(p)positions[plan.createdId]=p;render();return true;
+}
+let direct;
+function render(){
+ svg.replaceChildren();
+ for(const node of state.graph.nodes){
+  const p=positions[node.id];if(!p)continue;
+  const g=document.createElementNS(NS,'g');g.dataset.graphNode=node.id;g.setAttribute('tabindex','0');g.setAttribute('transform',`translate(${p.x},${p.y})`);
+  const rect=document.createElementNS(NS,'rect');for(const [key,value]of Object.entries({x:-110,y:-44,width:220,height:88,rx:9,class:'node-card'}))rect.setAttribute(key,value);
+  const text=document.createElementNS(NS,'text');text.setAttribute('x',-92);text.setAttribute('y',-3);text.setAttribute('class','node-title');text.textContent=node.title;
+  const meta=document.createElementNS(NS,'text');meta.setAttribute('x',-92);meta.setAttribute('y',20);meta.setAttribute('class','node-type');meta.textContent=`${node.type} · ${node.status}`;
+  g.append(rect,text,meta);g.addEventListener('click',()=>{state.selectedId=node.id;direct.updateToolbar();});svg.append(g);
+ }
+ direct?.decorate();
+}
+direct=createDirectCanvas({state,positions:()=>positions,scopeIds:()=>new Set(state.graph.nodes.map(n=>n.id)),perform,showModel:()=>document.dispatchEvent(new Event('studio:page')),startGesture:()=>{state.dragging='creation';},endGesture:()=>{state.dragging=null;},notify});
+document.querySelector('#undo').onclick=()=>{if(!history.length)return;future.push(snapshot());restore(history.pop());};
+document.querySelector('#redo').onclick=()=>{if(!future.length)return;history.push(snapshot());restore(future.pop());};
+document.querySelector('#save').onclick=()=>{saved=snapshot();};
+document.querySelector('#theme').onclick=()=>{document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'paper':'dark';};
+// Deliberately test-only host controls. Never imported by the production application.
+window.fixture={state,render,direct,get positions(){return positions;},get history(){return history;},get saved(){return saved;},snapshot,restore,reset(){state.graph=structuredClone(seed);positions={'feature:catalog':{x:600,y:160,pinned:false},'entity:bottle':{x:920,y:160,pinned:true}};history=[];future=[];render();}};
+render();window.fixtureReady=true;
+</script></html>
