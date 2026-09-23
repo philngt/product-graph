@@ -12,7 +12,7 @@ This slice makes the existing Model canvas easier to author without typing objec
 | Add a related object | Click its `+` handle or Related object. Choose a type, title and relationship. | Focus a card and press `+` or Insert; Tab/Enter also work on the handles. |
 | Add to the current scope | Existing Add to focus button; double-click empty canvas to choose placement. | Use the existing button in tab order. |
 | Connect existing objects | Drag `↗` from one card onto another, then explicitly choose meaning. A click opens the name picker. | Focus a card and press C, or use Connect / the existing inspector relationship button. |
-| Cancel | Cancel control, Escape; drop a connector outside a destination to abandon it. | Escape. |
+| Cancel | Cancel control, Escape; drop a connector outside the canvas to abandon it; dropping on empty canvas opens a create-and-connect form. | Escape. |
 
 The direct canvas editors are **small anchored modal forms** positioned near the object, not a full-screen authoring wizard or in-SVG rich-text editor. They block other authoring while open, preserve native input Undo and do not submit during IME composition. Enter applies locally; Escape discards this editor's text, not product data. A changed open editor triggers the existing kind of browser unload warning. Closing returns focus to the appropriate card or canvas. Native selects are searchable/filterable through the provided name field; stable IDs are secondary labels to disambiguate identical names, never required typed input.
 
@@ -49,3 +49,7 @@ Pure tests check identity/source preservation, validation, duplicate guards, exp
 The existing Studio browser regression retains the editorial Add object form instead of mocked prompts, and emits the native click following its synthetic pointer-up. Direct-canvas tests use the selected-object toolbar when testing the anchored forms and check the persistent Save-conflict notice. It remains a separate full-UI fixture suite and needs its ordinary prerequisites. No historical pass count is claimed as a current full-suite result.
 
 Before release, run the full repository tests and ordinary local workspace flows: new/old projects, actual Save/reopen, target/document/sketch coexistence, project switching, browser/OS input differences and accessibility checks. Source tests do not establish a measured usability improvement or platform certification.
+
+## Current refinement
+
+The [draw.io update](drawio-usability.md) centralizes the authoring contract and adds connector editing, blank-drop creation and changed-form discard confirmation. This supersedes the earlier immediate Escape-discard description. It does not embed a second editor or change execution permissions.

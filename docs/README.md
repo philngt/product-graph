@@ -55,3 +55,7 @@ The thesis owns principles; the brief owns users/value and hypotheses; architect
 When changing behavior, update its contract, the relevant flow, and tests together. When changing a major boundary, add or supersede a decision record. If code and a normative rule disagree, report the discrepancy; do not describe the rule as already enforced. Historical source links and test reports remain evidence of their own revision only.
 
 [Repository overview](../README.md) · [Current scripts](../package.json) · [Core graph types](../src/types.ts)
+
+## Draw.io authoring reconciliation
+
+[Shared authoring and direct edge editing](drawio-usability.md) supersedes the isolated PR #7 quick editor while keeping the newer editorial Studio.

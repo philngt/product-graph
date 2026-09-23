@@ -81,3 +81,7 @@ Manual acceptance on a real workspace:
 ## Deliberate follow-ups
 
 Project-wide impact semantics, transactional/revision-checked persistence, server-side security hardening, domain-specific authoring controls, saved navigation sessions, graph auto-layout, pattern instantiation, and SwiftUI generation remain separate slices. Do not infer those capabilities from the Studio's existing buttons or this navigation work.
+
+## Shared creation contract
+
+Editorial forms and canvas now share vocabulary/validation. Connector editing and drag-to-empty creation remain explicit, local and undoable. See [draw.io reconciliation](drawio-usability.md).

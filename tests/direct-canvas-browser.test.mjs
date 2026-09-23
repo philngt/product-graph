@@ -117,11 +117,14 @@ for (const [width, height] of [[1440, 1000], [1024, 768]]) {
     await p.mouse('mousePressed', point, 1); await p.mouse('mouseMoved', moved, 1); await p.mouse('mouseReleased', moved); await sleep(140);
     assert.notEqual(await ev(`document.querySelector('[data-graph-node=a]').getAttribute('transform')`), beforeTransform);
     await p.click('#undo-button'); assert.equal(await ev(`document.querySelector('[data-graph-node=a]').getAttribute('transform')`), beforeTransform);
-    // Dropping a connection on empty space cancels without allocating anything.
+    // Empty-space drop opens create-and-connect, but allocating still requires Apply.
     const s = await p.box(handle('a', 'connect')), frame = await ev(`(()=>{const r=document.querySelector('#graph-canvas').getBoundingClientRect();return {x:r.right-8,y:r.bottom-8}})()`);
     await p.mouse('mousePressed', s, 1); await p.mouse('mouseMoved', frame, 1); await p.mouse('mouseReleased', frame); await sleep(140);
     assert.equal(await ev(`document.querySelectorAll('.edge-line').length`), 0); assert.equal(await ev(`document.querySelectorAll('[data-graph-node]').length`), 3);
+    assert.equal(await ev(`Boolean(document.querySelector('#direct-choice'))`), true);
+    await p.click('[data-cancel]');
     assert.equal(await ev(`document.querySelector('.direct-editor')===null`), true);
+    assert.equal(await ev(`document.querySelectorAll('[data-graph-node]').length`), 3);
     assert.deepEqual(p.errors, []);
   });
 }
