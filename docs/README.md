@@ -43,6 +43,7 @@ Suggested first read: thesis → brief → architecture → user flows. Before i
 | [Implementation targets](implementation-targets.md) | Target configuration, pins, bindings, mapping findings and target-specific context. |
 | [Paper Studio](paper-studio.md) | Original visual/canvas slice and its historical scope. |
 | [Editorial Studio design](studio-design.md) | Refined visual system, project search, typed object/relationship forms, canvas-focus presentation and working-change review. |
+| [Direct canvas interaction](direct-canvas-interactions.md) | Rename at the object, add related objects and connect by name/drag with explicit meaning. |
 | [Hibi research](hibi-document-management.md) | Reference observations and possible document-management ideas, not an implementation checklist already completed. |
 
 Older slice documents preserve the scope at the time they were written. For example, the original Paper Studio's Target placeholder is superseded by the implementation-target contract. Do not infer that a capability is still absent solely because an older slice listed it as future work.

@@ -46,6 +46,7 @@ async function browserChecks() {
     const svgNode=q('[data-graph-node="step"]');
     svgNode.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:1,button:0,clientX:100,clientY:100}));
     window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1,button:0,clientX:100,clientY:100}));
+    svgNode.click(); // Native click follows pointer-up; preserves double-click rename.
     check(q('#save-state').textContent==='Ready','A pointer click does not dirty layout');
     check(q('#node-id').value==='step'&&q('#scope-title').textContent==='Rotation','Selection does not refocus');
     click('[data-lens="domain"]'); click('#node-list [data-node="rule"]'); input('#search','Cooldown'); click('#all-models-button');

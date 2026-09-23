@@ -6,6 +6,8 @@ import { createProjectClient } from "./project-client.js";
 import { initProjectSession } from "./project-session.js";
 import { initDocumentBrowser } from "./document-browser.js";
 import { initVisualAuthoring } from "./visual-authoring.js";
+import { createDirectCanvas } from "./direct-canvas.js";
+import { prepareCanvasEdit, nearbyPosition } from "./canvas-edit-model.js";
 import { initStudioExperience } from "./studio-experience.js";
 import { showObjectDialog, showRelationshipDialog } from "./object-dialogs.js";
 import { cardTitle, planObject, planRelationship, workingChanges } from "./studio-presentation.js";
@@ -16,6 +18,7 @@ const regions = ["intent", "product", "business", "workflow", "domain", "experie
 const colors = { intent: "#aa8039", product: "#b25c40", business: "#94758d", workflow: "#b8954e", domain: "#65937a", experience: "#9c80a8", architecture: "#7193ab", decision: "#a76b5d", quality: "#897bad" };
 const state = { graph: null, baseline: null, diagnostics: [], focusAreas: [], tours: [], library: { patterns: [], templates: [] }, proposals: [], scope: projectScope(), view: "overview", search: "", selectedId: null, context: null, compare: null, drawer: "context", dirty: false, history: [], future: [], layout: {}, scopeBack: [], scopeForward: [], tour: null, dragging: null, drawerOpen: false, busy: false, formId: null, formDirty: false, contextRequest: 0, contextError: "", drawerRequest: 0 };
 const $ = (id) => document.getElementById(id);
+let directCanvas;
 
 const projectClient = createProjectClient(location.pathname);
 const request = projectClient.request;
@@ -36,7 +39,7 @@ function scopedNodes() { return projectView(state.graph, state).nodes; }
 
 function selectedNode() { return nodeById(state.selectedId); }
 function commit(mutator) {
-  if (state.busy || !discardDraft()) return false;
+  if (state.busy || state.dragging || !discardDraft()) return false;
   state.history.push(snapshot());
   state.future = [];
   mutator();
@@ -47,7 +50,7 @@ function commit(mutator) {
 }
 
 function undo() {
-  if (state.busy || !state.history.length || !discardDraft()) return;
+  if (state.busy || state.dragging || !state.history.length || !discardDraft()) return;
   state.future.push(snapshot());
   restore(state.history.pop());
   markDirty();
@@ -56,7 +59,7 @@ function undo() {
 }
 
 function redo() {
-  if (state.busy || !state.future.length || !discardDraft()) return;
+  if (state.busy || state.dragging || !state.future.length || !discardDraft()) return;
   state.history.push(snapshot());
   restore(state.future.pop());
   markDirty();
@@ -84,6 +87,7 @@ function setStatus(text, dirty = state.dirty) {
     ? "Unapplied edits. Apply them to the working model, then Save model."
     : "Apply updates the working model. Save writes it to your files.";
   $("inspector-draft-status").dataset.dirty = String(state.formDirty);
+  directCanvas?.updateToolbar();
 }
 
 function toast(message) { const node = $("toast"); node.textContent = message; node.classList.add("show"); setTimeout(() => node.classList.remove("show"), 2300); }
@@ -144,7 +148,11 @@ function renderGraph() {
     return `<g class="graph-node ${node.id === state.selectedId ? "selected" : ""}" data-graph-node="${escapeHtml(node.id)}" transform="translate(${p.x - CARD.width / 2},${p.y - CARD.height / 2})" tabindex="0" role="button" aria-label="${escapeHtml(node.title)}, ${escapeHtml(regionOf(node))} node" aria-pressed="${node.id === state.selectedId}"><title>${escapeHtml(node.title)} · ${escapeHtml(node.id)}</title><rect class="node-card" width="${CARD.width}" height="${CARD.height}" rx="9"/><line class="node-accent accent-${escapeHtml(regionOf(node))}" x1="1" y1="16" x2="1" y2="72"/><text class="node-type" x="16" y="20">${escapeHtml(trim(node.type.toUpperCase(), 27))}</text><text class="node-title" x="16" y="42">${titleLines.map((line, i) => `<tspan x="16" dy="${i ? 17 : 0}">${escapeHtml(line)}</tspan>`).join("")}</text><text class="node-status" x="16" y="78">${escapeHtml(node.status || "Not specified")}</text>${p.pinned ? '<text class="node-pin" x="188" y="20">PIN</text>' : ''}</g>`;
   }).join("");
   svg.querySelectorAll("[data-graph-node]").forEach(node => {
-    node.addEventListener("click", () => selectNode(node.dataset.graphNode));
+    node.addEventListener("click", () => {
+      if (selectNode(node.dataset.graphNode)) {
+        [...svg.querySelectorAll("[data-graph-node]")].find(item => item.dataset.graphNode === state.selectedId)?.focus({ preventScroll: true });
+      }
+    });
     node.addEventListener("keydown", event => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault(); selectNode(node.dataset.graphNode);
@@ -153,11 +161,12 @@ function renderGraph() {
     });
     node.addEventListener("pointerdown", event => startDrag(event, node.dataset.graphNode));
   });
+  directCanvas?.decorate();
   $("auto-layout").disabled = state.busy || !nodes.length || Boolean(state.dragging);
   $("unpin-selection").disabled = state.busy || !state.layout[scopeKey()]?.positions?.[state.selectedId]?.pinned || Boolean(state.dragging);
 }
 function startDrag(event, id) {
-  if (event.button !== 0 || state.busy) return;
+  if (event.button !== 0 || state.busy || state.dragging) return;
   const before = snapshot();
   const key = scopeKey();
   const matrixAtStart = $("graph-svg").getScreenCTM();
@@ -189,7 +198,8 @@ function startDrag(event, id) {
       renderGraph();
       return;
     }
-    if (!moved) { selectNode(id); return; }
+    if (!moved) return; // Native click selects; keep the card stable for double-click.
+    directCanvas?.suppressClick();
     state.history.push(before);
     state.future = [];
     markDirty();
@@ -203,6 +213,9 @@ function startDrag(event, id) {
 function selectNode(id) {
   if (!nodeById(id) || (id !== state.selectedId && !discardDraft())) return false;
   pages.show("model");
+  // Palette callers need a success value; repeated selection must not replace
+  // the SVG node between the two clicks of a direct rename gesture.
+  if (state.selectedId === id) return true;
   state.selectedId = id;
   state.context = null;
   render();
@@ -395,7 +408,6 @@ function render() {
   });
   document.querySelectorAll("#node-form input, #node-form select, #node-form textarea, #node-form button, #add-node, #add-edge, #context-refresh").forEach((element) => { element.disabled = state.busy; });
   $("add-edge").disabled = state.busy || !selectedNode();
-  $("add-edge").disabled = state.busy || !selectedNode();
   setStatus(state.dirty ? "Unsaved changes" : "Ready");
   renderAgentDrawer();
   pages.render();
@@ -519,6 +531,37 @@ $("delete-node").addEventListener("click", () => {
     state.selectedId = null;
   });
 });
+function performCanvasEdit(edit, preferred) {
+  if (state.busy || state.dragging || state.formDirty) return false;
+  const plan = prepareCanvasEdit(state.graph, edit);
+  if (!plan.changed) return true;
+  const key = scopeKey();
+  const position = plan.createdId ? nearbyPosition(preferred, displayedPositions, CARD) : null;
+  const applied = commit(() => {
+    state.graph = plan.graph;
+    state.selectedId = plan.selectedId;
+    if (position) {
+      state.layout[key] ||= { schemaVersion: "1.0.0", positions: {} };
+      // Preserve visible geometry, including pin flags, when inserting an adjacent card.
+      state.layout[key].positions = { ...state.layout[key].positions, ...clone(displayedPositions), [plan.createdId]: position };
+    }
+  });
+  if (!applied) return false;
+  if (plan.createdId) {
+    state.search = ""; $("search").value = "";
+    if (state.scope.id !== "project") {
+      let depth = state.scope.depth;
+      while (depth < 8 && !neighborhood(state.graph, state.scope.rootIds, depth).has(plan.createdId)) depth++;
+      if (depth !== state.scope.depth) navigateUI({ scope: { ...state.scope, depth }, search: "" });
+    }
+    render();
+  }
+  refreshContext();
+  toast(edit.action === "create" ? "Draft object added. Save to persist." : edit.action === "connect" ? "Relationship added. No workflow was executed." : "Title updated. Save to persist.");
+  return true;
+}
+
+// Sidebar and command palette keep the editorial form; canvas handles use direct editors.
 function addObject() {
   if (!state.graph || state.busy || state.dragging) return false;
   const rootId = state.scope.id === "project" ? null : state.scope.rootIds[0];
@@ -560,6 +603,16 @@ const experience = initStudioExperience({ state, showPage: page => pages.show(pa
   focus: area => setScope({ id: area.id, title: area.title, rootIds: area.rootIds, depth: area.depth }),
   addObject, openProposals: () => openDrawer("proposals") });
 document.addEventListener('studio:page', () => experience.refresh());
+directCanvas = createDirectCanvas({
+  state,
+  positions: () => displayedPositions,
+  scopeIds: () => projectView(state.graph, state).scopeIds,
+  perform: performCanvasEdit,
+  showModel: () => pages.show("model"),
+  startGesture: () => { state.dragging = "direct-connection"; },
+  endGesture: () => { state.dragging = null; },
+  notify: toast,
+});
 initAppearance();
 initDocumentBrowser({ request, graph: () => state.graph, isDirty: () => state.dirty, selection: () => state.selectedId, inspect: selectNode });
 initVisualAuthoring({
@@ -617,7 +670,7 @@ $("unpin-selection").addEventListener("click", () => {
   if (position?.pinned) commit(() => { position.pinned = false; });
 });
 $("graph-svg").addEventListener("pointerdown", event => {
-  if (event.button !== 0 || event.target.closest("[data-graph-node]")) return;
+  if (event.button !== 0 || state.dragging || event.target.closest("[data-graph-node], [data-canvas-action]")) return;
   const key = scopeKey(), svg = $("graph-svg"), matrix = svg.getScreenCTM();
   if (!matrix || !cameras.has(key)) return;
   const inverse = matrix.inverse(), origin = new DOMPoint(event.clientX, event.clientY).matrixTransform(inverse);

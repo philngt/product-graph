@@ -25,7 +25,9 @@
     "test:targets": "node --experimental-strip-types --test tests/implementation-targets.test.ts tests/implementation-context.test.ts",
     "test:targets:browser": "node --experimental-strip-types --test tests/implementation-targets-browser.test.mjs",
     "test:design": "node --test tests/studio-presentation.test.mjs",
-    "test:design:browser": "node --test tests/studio-design-browser.test.mjs tests/studio-browser.test.mjs"
+    "test:design:browser": "node --test tests/studio-design-browser.test.mjs tests/studio-browser.test.mjs",
+    "test:canvas:edit": "node --test tests/canvas-edit.test.mjs",
+    "test:canvas:browser": "node --test tests/direct-canvas-browser.test.mjs"
   },
   "engines": {
     "node": ">=22"
