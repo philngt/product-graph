@@ -53,3 +53,7 @@ Before release, run the full repository tests and ordinary local workspace flows
 ## Current refinement
 
 The [draw.io update](drawio-usability.md) centralizes the authoring contract and adds connector editing, blank-drop creation and changed-form discard confirmation. This supersedes the earlier immediate Escape-discard description. It does not embed a second editor or change execution permissions.
+
+## Visual creation library
+
+[Building blocks and drag-to-create](creation-interactions.md) adds a searchable, collapsible type library. Drag a type onto blank canvas or an existing object; alternatively click a type and a position, or use Place in center / keyboard activation. Placement shows a temporary collision-aware preview, then a preselected creation form with optional description and an explicit **Create draft** action. Related creation still requires a chosen relationship; cancellation creates nothing. The new contract distinguishes its targeted module fixture tests from the broader Studio tests above and lists remaining integration/release checks.

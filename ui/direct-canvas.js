@@ -1,5 +1,6 @@
 import { OBJECT_CHOICES, RELATION_CHOICES, findConnectionTargets } from './canvas-edit-model.js';
 import { observedEdge } from './authoring-model.js';
+import { createCreationShelf } from './creation-shelf.js';
 import { CARD, connectorGeometry } from './canvas-layout.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -13,8 +14,8 @@ export function createDirectCanvas({ state, positions, scopeIds, perform, showMo
   const toolbar = document.createElement('div'); toolbar.className = 'direct-toolbar'; toolbar.setAttribute('role', 'group'); toolbar.setAttribute('aria-label', 'Selected object actions');
   toolbar.innerHTML = '<span id="direct-selected">Select an object</span><button type="button" data-direct="add" title="Add to current scope (N)">＋ Add object</button><button type="button" data-direct="rename" title="Rename (F2)">Rename</button><button type="button" data-direct="create" title="Add a related object (+)">＋ Related</button><button type="button" data-direct="connect" title="Connect by name (C)">↗ Connect</button><button type="button" data-direct="help" title="Canvas help (?)">?</button>';
   surface.before(toolbar);
-  const hint = document.createElement('p'); hint.className = 'direct-hint'; hint.textContent = 'Drag ↗ onto an object to connect, or empty canvas to create + connect · Click a relationship to edit · F2 / C / N / ?'; surface.after(hint);
-  let editor = null, draftChanged = false, gesture = null, suppressClickUntil = 0;
+  const hint = document.createElement('p'); hint.className = 'direct-hint'; hint.textContent = 'Building blocks: drag a type or click to place · ↗ Connect · Double-click to add / rename · N / C / F2 / ?'; surface.after(hint);
+  let editor = null, draftChanged = false, gesture = null, suppressClickUntil = 0, creationShelf;
   const node = id => state.graph?.nodes.find(n => n.id === id);
   const blocked = () => {
     if (!state.graph || state.busy || state.dragging || editor || document.querySelector('dialog[open]')) return true;
@@ -23,7 +24,7 @@ export function createDirectCanvas({ state, positions, scopeIds, perform, showMo
   };
   const elementFor = id => [...svg.querySelectorAll('[data-graph-node]')].find(el => el.dataset.graphNode === id);
   function worldPoint(x, y) { const matrix = svg.getScreenCTM(); return matrix ? new DOMPoint(x, y).matrixTransform(matrix.inverse()) : null; }
-  function openEditor(title, body, anchorId, submit, first = 'input') {
+  function openEditor(title, body, anchorId, submit, first = 'input', anchorPoint = null) {
     const d = document.createElement('dialog'); editor = d; draftChanged = false; let returnFocus = anchorId;
     d.className = 'direct-editor'; d.setAttribute('aria-labelledby', 'direct-editor-title');
     d.innerHTML = `<form><header><h3 id="direct-editor-title">${esc(title)}</h3><button type="button" data-cancel aria-label="Cancel edit">×</button></header>${body}<p id="direct-error" role="alert"></p><footer><span>Apply changes locally · Save persists</span>${submit ? '<button class="button button-primary" id="direct-submit" type="submit">Apply</button>' : ''}</footer></form>`;
@@ -44,7 +45,9 @@ export function createDirectCanvas({ state, positions, scopeIds, perform, showMo
     d.querySelector('form').onsubmit = event => { event.preventDefault(); if (!composing && submit && d.querySelector('form').reportValidity()) finish(() => submit(d)); };
     document.body.append(d); d.showModal();
     const position = () => {
-      const box = elementFor(anchorId)?.getBoundingClientRect() || surface.getBoundingClientRect();
+      const matrix = svg.getScreenCTM();
+      const anchor = anchorPoint && matrix ? new DOMPoint(anchorPoint.x, anchorPoint.y).matrixTransform(matrix) : null;
+      const box = anchor ? { left: anchor.x + 18, top: anchor.y - 44 } : elementFor(anchorId)?.getBoundingClientRect() || surface.getBoundingClientRect();
       d.style.left = `${Math.max(12, Math.min(innerWidth - d.offsetWidth - 12, box.left))}px`;
       d.style.top = `${Math.max(12, Math.min(innerHeight - d.offsetHeight - 12, box.top))}px`;
     };
@@ -74,15 +77,22 @@ export function createDirectCanvas({ state, positions, scopeIds, perform, showMo
     openEditor('Rename object', `<label>Title<input id="direct-title" maxlength="200" required value="${esc(n.title)}" /></label><p class="direct-note">Identity, relationships, documents and metadata stay the same.</p>`, id,
       d => perform({ action: 'rename', id, expectedTitle, title: d.querySelector('#direct-title').value }));
   }
-  function add(from, preferred) {
+  function add(from, preferred, choiceKey) {
     if (blocked()) return;
     if (!from && state.scope.id !== 'project') from = state.scope.rootIds.find(id => node(id));
     if (state.scope.id !== 'project' && (!from || !scopeIds().has(from))) return notify('Choose an object in this focus, or open All models before adding.');
     if (from && !node(from)) return notify('Source object is missing.');
     showModel();
     const p = positions()[from], point = preferred || (p ? { x: p.x + CARD.width + 100, y: p.y } : { x: 160, y: 120 });
-    const { dialog: d } = openEditor(from ? 'Add related object' : 'Add product object', `${from ? `<p class="direct-source">From: <strong>${esc(node(from).title)}</strong></p>` : ''}<label>What does it represent?<select id="direct-choice" required><option value="">Choose object type…</option>${OBJECT_CHOICES.map(c => `<option value="${c.key}">${esc(c.label)}</option>`).join('')}</select></label><label>Title<input id="direct-title" required maxlength="200" placeholder="Name this product concept" /></label>${from ? relationFields() : ''}<p class="direct-note">New object and relationship form one Undo step. New objects are drafts. Your current lens may hide other types.</p>`, from,
-      d => perform({ action: 'create', choice: d.querySelector('#direct-choice').value, title: d.querySelector('#direct-title').value, from, kind: from ? relationValue(d) : undefined }, point), '#direct-title');
+    const choice = OBJECT_CHOICES.find(c => c.key === choiceKey);
+    if (choiceKey && !choice) return notify('Choose an available building block.');
+    const { dialog: d } = openEditor(from ? 'Add related object' : 'Add product object', `${from ? `<p class="direct-source">Related to: <strong>${esc(node(from).title)}</strong></p>` : ''}<label>What does it represent?<select id="direct-choice" required aria-describedby="creation-kind-help"><option value="">Choose object type…</option>${OBJECT_CHOICES.map(c => `<option value="${c.key}">${esc(c.label)}</option>`).join('')}</select></label><p id="creation-kind-help" class="creation-kind-help"></p><label>Title<input id="direct-title" required maxlength="200" placeholder="Name this product concept" /></label>${from ? relationFields() : ''}<details><summary>Add a description (optional)</summary><label>Description<textarea id="direct-description" maxlength="4000" rows="3" placeholder="What should someone understand about this object?"></textarea></label></details><p class="direct-note">One Undo step. Nothing is saved until Save model. Your current lens may hide other object types.</p>`, from,
+      d => perform({ action: 'create', choice: d.querySelector('#direct-choice').value, title: d.querySelector('#direct-title').value, description: d.querySelector('#direct-description').value, from, kind: from ? relationValue(d) : undefined }, point), '#direct-title', preferred);
+    d.classList.add('creation-editor');
+    d.querySelector('#direct-submit').textContent = 'Create draft';
+    const updateChoice = () => { d.querySelector('#creation-kind-help').textContent = OBJECT_CHOICES.find(c => c.key === d.querySelector('#direct-choice').value)?.help || 'Choose the product concept, not its implementation platform.'; };
+    if (choice) d.querySelector('#direct-choice').value = choice.key;
+    d.querySelector('#direct-choice').addEventListener('change', updateChoice); updateChoice();
     if (from) configureRelation(d);
   }
   function destinationFields() { return '<label>Find destination by name<input id="direct-query" type="search" placeholder="Search this project" autocomplete="off" /></label><label>To<select id="direct-destination" size="5" required aria-describedby="direct-result-count"></select></label><p id="direct-result-count" class="direct-note"></p>'; }
@@ -117,11 +127,12 @@ export function createDirectCanvas({ state, positions, scopeIds, perform, showMo
   }
   function help() {
     if (!state.graph || state.busy || state.dragging || editor || document.querySelector('dialog[open]')) return;
-    openEditor('Canvas help', '<dl class="direct-shortcuts"><dt>N / Add object</dt><dd>Add in the current scope; choose explicit meaning.</dd><dt>+ / Insert</dt><dd>Add related to the focused object.</dd><dt>C</dt><dd>Find and connect an existing object, even outside the current lens.</dd><dt>F2</dt><dd>Rename the focused object.</dd><dt>Drag ↗</dt><dd>Drop on an object to connect, on empty canvas to create + connect, or outside to cancel.</dd><dt>Relationship / Tab + Enter</dt><dd>Edit a connector’s meaning or destination.</dd><dt>Escape</dt><dd>Cancel a gesture; confirm discarding a changed form.</dd><dt>Undo / Save model</dt><dd>Edits are local and reversible. Save still writes the full graph.</dd></dl>', state.selectedId, null, '[data-cancel]');
+    openEditor('Canvas help', '<dl class="direct-shortcuts"><dt>Building blocks</dt><dd>Drag a type to create, or click a type then a canvas position. Enter places in the center; Escape cancels. Drop on an object to choose a relationship next.</dd><dt>N / Add object</dt><dd>Add in the current scope; choose explicit meaning.</dd><dt>+ / Insert</dt><dd>Add related to the focused object.</dd><dt>C</dt><dd>Find and connect an existing object, even outside the current lens.</dd><dt>F2</dt><dd>Rename the focused object.</dd><dt>Drag ↗</dt><dd>Drop on an object to connect, on empty canvas to create + connect, or outside to cancel.</dd><dt>Relationship / Tab + Enter</dt><dd>Edit a connector’s meaning or destination.</dd><dt>Escape</dt><dd>Cancel a gesture; confirm discarding a changed form.</dd><dt>Undo / Save model</dt><dd>Edits are local and reversible. Save still writes the full graph.</dd></dl>', state.selectedId, null, '[data-cancel]');
   }
   function updateToolbar() {
     const n = node(state.selectedId); toolbar.querySelector('#direct-selected').textContent = n?.title || 'Select an object to edit';
-    for (const b of toolbar.querySelectorAll('button')) b.disabled = !state.graph || state.busy || Boolean(state.dragging) || (!['add', 'help'].includes(b.dataset.direct) && !n);
+    for (const b of toolbar.querySelectorAll('[data-direct]')) b.disabled = !state.graph || state.busy || Boolean(state.dragging) || (!['add', 'help'].includes(b.dataset.direct) && !n);
+    creationShelf?.refresh();
   }
   function decorate() {
     updateToolbar();
@@ -197,7 +208,7 @@ export function createDirectCanvas({ state, positions, scopeIds, perform, showMo
     else (handle.dataset.canvasAction === 'create' ? add : connect)(handle.dataset.source);
   }, true);
   surface.addEventListener('keydown', event => {
-    if (event.defaultPrevented || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || event.target.closest('input,textarea,select,[contenteditable=true]') || document.querySelector('dialog[open]')) return;
+    if (event.defaultPrevented || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || event.target.closest('input,textarea,select,[contenteditable=true],.creation-shelf,.creation-status') || document.querySelector('dialog[open]')) return;
     const edge = event.target.closest('[data-edge-index]'), handle = event.target.closest('[data-canvas-action]'), element = event.target.closest('[data-graph-node]');
     if (edge && ['Enter', ' ', 'F2'].includes(event.key)) { event.preventDefault(); event.stopImmediatePropagation(); editEdge(Number(edge.dataset.edgeIndex)); return; }
     if (handle && ['Enter', ' '].includes(event.key)) { event.preventDefault(); event.stopImmediatePropagation(); (handle.dataset.canvasAction === 'create' ? add : connect)(handle.dataset.source); return; }
@@ -212,7 +223,8 @@ export function createDirectCanvas({ state, positions, scopeIds, perform, showMo
     const card = event.target.closest('[data-graph-node]') || document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-graph-node]');
     event.preventDefault(); if (card) rename(card.dataset.graphNode); else add(undefined, worldPoint(event.clientX, event.clientY));
   });
-  for (const b of toolbar.querySelectorAll('button')) b.onclick = () => ({ rename, create: () => add(state.selectedId), add: () => add(), connect, help })[b.dataset.direct]();
+  for (const b of toolbar.querySelectorAll('[data-direct]')) b.onclick = () => ({ rename, create: () => add(state.selectedId), add: () => add(), connect, help })[b.dataset.direct]();
+  creationShelf = createCreationShelf({ state, svg, surface, toolbar, positions, scopeIds, blocked, add, startGesture, endGesture, notify, suppressClick: () => { suppressClickUntil = performance.now() + 200; } });
   window.addEventListener('beforeunload', e => { if (editor && draftChanged) { e.preventDefault(); e.returnValue = ''; } });
-  return { decorate, updateToolbar, rename, add, connect, editEdge, help, suppressClick: () => { suppressClickUntil = performance.now() + 120; }, cancelGesture: () => gesture?.cancel() };
+  return { decorate, updateToolbar, rename, add, connect, editEdge, help, suppressClick: () => { suppressClickUntil = performance.now() + 120; }, cancelGesture: () => { gesture?.cancel(); creationShelf.cancel(); } };
 }
