@@ -10,12 +10,15 @@ export function studioHTML(setup, fixture, checks) {
   const moduleURL = file => {
     if (cache.has(file)) return cache.get(file);
     if (!file.startsWith(root + path.sep) && path.dirname(file) !== root) throw new Error('Module outside UI root');
-    const source = fs.readFileSync(file, 'utf8').replace(/from\s+(["'])(\.\/[^"']+)\1/g, (_, quote, relative) => `from ${JSON.stringify(moduleURL(path.resolve(path.dirname(file), relative)))}`);
+    const source = fs.readFileSync(file, 'utf8').replace(/(\.href\s*=\s*)(['"])(\/[a-z-]+\.css)\2/g, (_, prefix, quote, name) => {
+      const css = fs.readFileSync(path.join(root, name.slice(1)), 'utf8');
+      return prefix + JSON.stringify(`data:text/css;base64,${Buffer.from(css).toString('base64')}`);
+    }).replace(/from\s+(["'])(\.\/[^"']+)\1/g, (_, quote, relative) => `from ${JSON.stringify(moduleURL(path.resolve(path.dirname(file), relative)))}`);
     const url = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
     cache.set(file, url); return url;
   };
   const app = moduleURL(path.join(root, 'app.js'));
-  const css = ['styles.css', 'studio.css'].map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
+  const css = ['styles.css', 'studio.css', 'studio-design.css'].map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
   return fs.readFileSync(path.join(root, 'index.html'), 'utf8')
     .replace(/<link rel="stylesheet"[^>]*>/g, '')
     .replace('</head>', `<style>${css}</style></head>`)

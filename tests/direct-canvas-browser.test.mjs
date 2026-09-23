@@ -61,11 +61,11 @@ for (const [width, height] of [[1440, 1000], [1024, 768]]) {
     await p.fill('#direct-query', 'Bottle'); await p.fill('#direct-destination', 'b'); await p.fill('#direct-kind', 'reads');
     if (width === 1440) await p.screenshot('canvas-connect-by-name.png');
     await applyForm(p);
-    await p.click('#add-edge'); await p.fill('#direct-query', 'Bottle'); await p.fill('#direct-destination', 'b'); await p.fill('#direct-kind', 'reads'); await p.click('#direct-submit');
+    await p.click('[data-direct=connect]'); await p.fill('#direct-query', 'Bottle'); await p.fill('#direct-destination', 'b'); await p.fill('#direct-kind', 'reads'); await p.click('#direct-submit');
     assert.match(await ev(`document.querySelector('#direct-error').textContent`), /already exists/); await p.key('Escape');
     // Save still submits the complete graph, not only the isolated/filtered view.
     await p.click('#isolate-button'); await ev('window.__saveFail=true'); await p.click('#save-button');
-    await p.wait(`document.querySelector('#toast').textContent.includes('conflict')`);
+    await p.wait(`document.querySelector('#save-feedback-text').textContent.includes('conflict')`);
     assert.equal(await ev(`document.querySelector('#save-state').textContent`), 'Unsaved changes');
     await ev('window.__saveFail=false'); await p.click('#save-button'); await p.wait(`document.querySelector('#save-state').textContent==='Ready'`);
     const saved = await ev('window.__saved()');
@@ -141,7 +141,7 @@ test('Inspector draft, IME/native undo, hidden lens, busy save and untrusted tit
   assert.equal(await ev(`!window.dispatchEvent(new Event('beforeunload',{cancelable:true}))`), true);
   await applyForm(p); assert.equal(await ev('window.injected'), undefined); assert.equal(await ev(`document.querySelector('#graph-svg img')===null`), true);
   // A type hidden by the current lens remains in the full graph and selection inspector.
-  await p.click('#add-node'); await p.fill('#direct-choice', 'screen'); await p.fill('#direct-title', 'Usage detail'); await applyForm(p);
+  await p.click('[data-direct=create]'); await p.fill('#direct-choice', 'screen'); await p.fill('#direct-title', 'Usage detail'); await p.fill('#direct-kind', 'supports'); await applyForm(p);
   assert.match(await ev(`document.querySelector('#selection-visibility').textContent`), /hidden by this lens/);
   await ev('window.__saveDelay=150'); await p.click('#save-button');
   await ev(`document.querySelector('#add-node').click()`); assert.equal(await ev(`document.querySelector('.direct-editor')===null`), true);
@@ -158,7 +158,7 @@ test('Inspector draft, IME/native undo, hidden lens, busy save and untrusted tit
 test('Blank canvas creation, keyboard-only handles and custom relation', { skip: !browser, timeout: 45000 }, async t => {
   const data = seed(); data.graph.nodes = []; data.graph.documents = []; data.focusAreas = [];
   const p = await openCanvas(browser, data); t.after(p.close); const ev = p.evaluate;
-  await p.click('#empty-state', true); await p.wait(`document.querySelector('#direct-title')`);
+  await ev(`document.querySelector('#graph-canvas').dispatchEvent(new MouseEvent('dblclick',{bubbles:true,clientX:300,clientY:300}))`); await p.wait(`document.querySelector('#direct-title')`);
   assert.equal(await ev(`document.querySelector('#direct-kind')===null`), true);
   await p.fill('#direct-choice', 'entity'); await p.fill('#direct-title', 'Bottle'); await applyForm(p);
   const source = await ev(`document.querySelector('#node-id').value`);

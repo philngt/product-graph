@@ -1,6 +1,6 @@
 # User flows
 
-Status: working flows at the [documentation baseline](README.md#baseline-and-status), followed by explicitly planned flows. The unit of work is a feature or another bounded product object; lenses are not mandatory wizard stages.
+Status: working flows at the [documentation baseline](README.md#baseline-and-status), followed by explicitly planned flows. The unit of work is a feature or another bounded product object; lenses are not mandatory wizard stages. The later [Editorial Studio update](studio-design.md) refines search, explicit forms, presentation focus and review without changing these source/permission boundaries.
 
 ## 1. Create or open a project — implemented
 
@@ -24,17 +24,17 @@ Create a pending proposal, inspect new objects, relations, exact commands and or
 
 **Exit:** source notes plus either a reviewed model change or a retained unaccepted proposal.
 
-## 3. Work on a feature across lenses — implemented with basic editors
+## 3. Work on a feature across lenses — implemented with explicit forms
 
-**Entry:** focus area, object search or Show in model after a proposal.
+**Entry:** focus area, **Find anything** (`Command/Ctrl K`) or Show in model after a proposal. Project-wide search can inspect objects outside the visible lens; **Inspect** keeps focus while a **Focus** result deliberately changes it.
 
 Click selects for inspection. **Focus here** changes the working scope. Change Product/Business/Workflow/Domain/Experience/Architecture lenses without changing object identity. Use Isolate, Expand +1 and All models as needed; Back/Forward restores navigation, not product edits.
 
-Edit the selected object's supported properties, use advanced metadata only when necessary, and add explicit relationships. Graph Undo/Redo changes the local graph/layout; Save persists the full model, including hidden objects. Arrange/pin affects presentation, not ownership.
+**Add object** opens supported-kind/name/purpose fields. Creating in a focus requires choosing a semantic link; node and link form one undoable change. **Add relationship** searches existing objects by name instead of requiring a typed ID. Edit the selected object's supported properties and use advanced metadata only when necessary. Graph Undo/Redo changes the local graph/layout; **Save model** persists the full model, including hidden objects. Arrange/pin affects presentation, not ownership. Canvas focus (`Shift F`, Escape to exit) hides/inerts side panels without changing graph scope or dirty state.
 
-**Recovery:** a lens/search-hidden selection stays inspectable. A deleted focus root produces an empty focus, not a silent whole-project fallback. Cancel a draft-discard prompt to keep unapplied inspector input.
+**Recovery:** a lens/search-hidden selection stays inspectable. A deleted focus root produces an empty focus, not a silent whole-project fallback. Cancel a draft-discard prompt to keep unapplied inspector or new-object input. Failed saves retain working edits and display a persistent notice. **Review changes** exposes exact working-model before/after data; layout is explicitly outside that comparison.
 
-**Limit:** specialized field, condition, branch and sample-case builders are planned. The current generic editor is not a full no-code workflow designer. [Studio contract](semantic-model-studio.md).
+**Limit:** specialized field, condition, branch and sample-case builders are planned. These explicit forms are not a full no-code workflow designer. [Studio contract](semantic-model-studio.md) and [design/interaction contract](studio-design.md).
 
 ## 4. Read source documents in context — implemented, read only
 
