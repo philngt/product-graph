@@ -37,6 +37,7 @@ Suggested first read: thesis → brief → architecture → user flows. Before i
 
 | Document | Owns the details of |
 | --- | --- |
+| [Direct canvas interaction](direct-canvas-interactions.md) | Rename at the object, add related objects and connect by name/drag with explicit meaning. |
 | [Semantic Model Studio](semantic-model-studio.md) | Focus, lens, selection, visibility and navigation/edit-history separation. |
 | [Multi-project workspace](multi-project-workspace.md) | Catalog, routes, saved-source documents, project switching and local-file boundaries. |
 | [Visual authoring](visual-authoring.md) | Sketch storage, explicit definitions, exact proposal review and product task context. |

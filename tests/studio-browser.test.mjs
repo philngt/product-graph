@@ -46,6 +46,7 @@ async function browserChecks() {
     const svgNode=q('[data-graph-node="step"]');
     svgNode.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:1,button:0,clientX:100,clientY:100}));
     window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1,button:0,clientX:100,clientY:100}));
+    svgNode.click(); // Synthetic pointer-up does not synthesize the native click event.
     check(q('#save-state').textContent==='Ready','A pointer click does not dirty layout');
     check(q('#node-id').value==='step'&&q('#scope-title').textContent==='Rotation','Selection does not refocus');
     click('[data-lens="domain"]'); click('#node-list [data-node="rule"]'); input('#search','Cooldown'); click('#all-models-button');
@@ -77,7 +78,9 @@ async function browserChecks() {
     const saved=await(await fetch('/__qa')).json();
     check(saved.savedNodes===6&&saved.savedTitle==='Recommend draft','Save writes the whole edited graph, not just the visible projection');
     check(q('#save-state').textContent==='Ready','Successful save clears dirty state');
-    const answers=['Exception path','contains']; window.prompt=()=>answers.shift()??null; click('#add-node');
+    window.prompt=()=>{throw new Error('Object creation must not require prompt()')}; click('#add-node');
+    input('#direct-choice','step'); input('#direct-title','Exception path'); input('#direct-kind','contains');
+    click('#direct-submit');
     check(q('#node-title').value==='Exception path'&&nodes()>=2,'Add to focus connects the new object and reveals it');
     click('#undo-button'); check(![...document.querySelectorAll('.node-title')].some(el=>el.textContent==='Exception path'),'Undo removes the added object and relationship together');
     click('#redo-button'); check([...document.querySelectorAll('.node-title')].some(el=>el.textContent==='Exception path'),'Redo restores the creation');
