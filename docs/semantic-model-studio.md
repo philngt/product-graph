@@ -37,7 +37,7 @@ The projection never becomes the save payload. Saving from an isolated one-node 
 
 - Unapplied inspector input survives lens switches, search, drawer actions and async context responses. Moving to a different selected object asks before discarding an unapplied draft.
 - Apply changes moves the draft into the local graph; Save persists the graph. Save asks users to apply pending object edits first.
-- New objects in a focus require an explicit user-selected relationship. Ordinary Add uses a valid focus root; Add related explicitly anchors the selected object. Creation, relationship and placement form one undoable edit. The form exposes whether to switch to Overview, clear search and expand the existing focus to reveal the result.
+- New objects in a focus require an explicit user-selected relationship from a valid focus root. Creation and relationship creation are one undoable edit. A depth-zero focus expands to reveal the newly linked object.
 - Clicking a canvas node is not a layout edit. Dragging must cross a movement threshold; pointer cancellation restores the previous layout.
 - Undo shortcuts in inputs and textareas remain native text-editing shortcuts.
 - Proposal application is blocked while local model/layout changes or an unapplied draft exist. Saving/applying disables authoring until the response completes. Successful proposal application clears obsolete model undo snapshots.
@@ -46,16 +46,6 @@ The projection never becomes the save payload. Saving from an isolated one-node 
 Context requests use a sequence token: a late response for object A cannot replace the inspector context for B. The existing context API reads saved files, so unsaved model changes invalidate those cards and explicitly ask the user to save before refreshing. Saved validation is labeled as such; no percentage-based readiness claims are introduced.
 
 The supporting drawer starts collapsed. Context, Compare, Agent proposals, Library and Guided tour remain accessible on demand. A late Compare response cannot overwrite another drawer.
-
-## Direct model authoring: quick-edit update
-
-The [draw.io-inspired usability slice](drawio-usability.md) replaces object/relationship prompt chains with accessible forms. Add object has an explicit semantic picker; Add related is available beside the selected node and in the toolbar. Connect existing searches project objects by name/type/ID without cloning them. Direction and relationship meaning are reviewed before the change; no meaning is inferred from proximity. Rename preserves stable identity.
-
-New objects remain drafts. These actions use the existing local commit/Undo/Save pipeline, not a new auto-save or agent proposal mechanism. Unapplied inspector edits block quick editing without being discarded. Form Cancel changes no graph data; unfinished form input is protected on close/unload. A no-op rename creates no edit.
-
-The optional reveal choice preserves focus root IDs and stays within the eight-hop limit. Unchecking it preserves the current lens/search/depth and existing hidden-selection explanations. Connect existing preserves focus and the selected starting object even when arrow direction is reversed. Keyboard actions are scoped to the model canvas, with button equivalents and help; text input retains native editing shortcuts.
-
-The new modules are `ui/quick-edit-model.js` (pure candidate/placement helpers), `ui/quick-edit.js` and `.css` (forms and canvas affordances), connected by `ui/app.js`. `tests/quick-edit-model.test.mjs` covers pure plans; `tests/quick-edit-browser.test.mjs` exercises the actual core app with explicit supporting-tool/API fixtures. Run `npm run test:quick-edit` and `PRODUCT_GRAPH_BROWSER=/path/to/chromium npm run test:quick-edit:browser`. The full-UI fixture's existing creation scenario is adapted to the new form; the focused core test is not a substitute for all full-UI/network tests.
 
 ## Code map
 
@@ -91,3 +81,7 @@ Manual acceptance on a real workspace:
 ## Deliberate follow-ups
 
 Project-wide impact semantics, transactional/revision-checked persistence, server-side security hardening, domain-specific authoring controls, saved navigation sessions, graph auto-layout, pattern instantiation, and SwiftUI generation remain separate slices. Do not infer those capabilities from the Studio's existing buttons or this navigation work.
+
+## Shared creation contract
+
+Editorial forms and canvas now share vocabulary/validation. Connector editing and drag-to-empty creation remain explicit, local and undoable. See [draw.io reconciliation](drawio-usability.md).

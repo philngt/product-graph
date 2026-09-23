@@ -1,0 +1,33 @@
+/* Direct manipulation uses existing Studio tokens. No external assets or runtime. */
+.direct-toolbar { display:flex; align-items:center; gap:6px; padding:8px 14px; border-bottom:1px solid var(--line); background:var(--surface); min-height:43px; flex-wrap:wrap; }
+.direct-toolbar > span { flex:1 1 100px; min-width:0; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font:13px var(--display); }
+.direct-toolbar button { color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:4px; padding:6px 9px; font-size:11px; }
+.direct-hint { margin:0; padding:7px 14px; border-top:1px solid var(--line); color:var(--muted); font-size:10px; line-height:1.5; }
+.direct-handle { cursor:pointer; }
+.direct-handle circle { fill:var(--paper); stroke:var(--frame); stroke-width:1.3; }
+.direct-handle text { fill:var(--accent); font:16px sans-serif; pointer-events:none; }
+.direct-handles.selected circle,.direct-handle:hover circle,.direct-handle:focus-visible circle { stroke:var(--accent); stroke-width:2; fill:var(--accent-wash); }
+.direct-handle[aria-disabled=true] { opacity:.4; cursor:not-allowed; }
+.direct-handle:focus-visible { outline:none; }
+.direct-preview { fill:none; stroke:var(--accent); stroke-width:2; stroke-dasharray:6 4; pointer-events:none; }
+.direct-drop-target .node-card { stroke:var(--accent); stroke-width:3; fill:var(--accent-wash); }
+.direct-editor { position:fixed; margin:0; width:min(440px,calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; padding:18px; color:var(--ink); background:var(--paper); border:1px solid var(--accent); border-radius:7px; box-shadow:0 12px 48px #231a1433; }
+.direct-editor::backdrop { background:#231a1412; }
+.direct-editor header { display:flex; justify-content:space-between; align-items:center; gap:14px; margin-bottom:12px; }
+.direct-editor h3 { margin:0; font:23px var(--display); }
+.direct-editor [data-cancel] { background:transparent; color:var(--muted); border:0; font-size:23px; padding:2px 6px; }
+.direct-editor label { display:grid; gap:6px; margin:12px 0; font-size:12px; color:var(--muted); }
+.direct-editor input,.direct-editor select { width:100%; min-width:0; padding:9px; color:var(--ink); background:var(--node); border:1px solid var(--line); border-radius:4px; font:13px system-ui,sans-serif; }
+.direct-editor #direct-title { font-size:18px; }
+.direct-editor select[size] { padding:5px; font-size:11px; }
+.direct-editor select[size] option { padding:6px 4px; }
+.direct-source { font-size:12px; overflow-wrap:anywhere; }
+.direct-note,.direct-editor footer > span { font-size:10px; color:var(--muted); line-height:1.6; }
+.direct-editor footer { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:14px; }
+#direct-error { color:var(--danger); font-size:12px; line-height:1.6; margin:10px 0; }
+.direct-editor input:focus-visible,.direct-editor select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.direct-edge-hit { fill:none; stroke:transparent; stroke-width:14; pointer-events:stroke; cursor:pointer; }
+.direct-edge-hit:hover,.direct-edge-hit:focus-visible { stroke:var(--accent); stroke-opacity:.25; outline:none; }
+.direct-edge-hit[aria-disabled=true] { cursor:not-allowed; }
+.direct-shortcuts { font-size:12px; line-height:1.65; }.direct-shortcuts dt { color:var(--accent); margin-top:10px; }.direct-shortcuts dd { margin-left:0; }
+@media(max-width:1100px) { .direct-toolbar > span { flex-basis:100%;max-width:none; }.direct-hint { font-size:9px; } }

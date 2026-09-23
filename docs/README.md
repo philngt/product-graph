@@ -38,11 +38,12 @@ Suggested first read: thesis → brief → architecture → user flows. Before i
 | Document | Owns the details of |
 | --- | --- |
 | [Semantic Model Studio](semantic-model-studio.md) | Focus, lens, selection, visibility and navigation/edit-history separation. |
-| [draw.io-inspired usability](drawio-usability.md) | Direct Add/Connect/Rename flows, explicit semantics, scoped keyboard controls and current test boundaries. |
 | [Multi-project workspace](multi-project-workspace.md) | Catalog, routes, saved-source documents, project switching and local-file boundaries. |
 | [Visual authoring](visual-authoring.md) | Sketch storage, explicit definitions, exact proposal review and product task context. |
 | [Implementation targets](implementation-targets.md) | Target configuration, pins, bindings, mapping findings and target-specific context. |
 | [Paper Studio](paper-studio.md) | Original visual/canvas slice and its historical scope. |
+| [Editorial Studio design](studio-design.md) | Refined visual system, project search, typed object/relationship forms, canvas-focus presentation and working-change review. |
+| [Direct canvas interaction](direct-canvas-interactions.md) | Rename at the object, add related objects and connect by name/drag with explicit meaning. |
 | [Hibi research](hibi-document-management.md) | Reference observations and possible document-management ideas, not an implementation checklist already completed. |
 
 Older slice documents preserve the scope at the time they were written. For example, the original Paper Studio's Target placeholder is superseded by the implementation-target contract. Do not infer that a capability is still absent solely because an older slice listed it as future work.
@@ -54,3 +55,7 @@ The thesis owns principles; the brief owns users/value and hypotheses; architect
 When changing behavior, update its contract, the relevant flow, and tests together. When changing a major boundary, add or supersede a decision record. If code and a normative rule disagree, report the discrepancy; do not describe the rule as already enforced. Historical source links and test reports remain evidence of their own revision only.
 
 [Repository overview](../README.md) · [Current scripts](../package.json) · [Core graph types](../src/types.ts)
+
+## Draw.io authoring reconciliation
+
+[Shared authoring and direct edge editing](drawio-usability.md) supersedes the isolated PR #7 quick editor while keeping the newer editorial Studio.
