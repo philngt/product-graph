@@ -51,7 +51,7 @@ export function canvasHTML(seed) {
     const code = (adapters[name] ?? fs.readFileSync(path.join(ui, name), 'utf8')).replace(/from\s+(['"])(\.\/[^'"]+)\1/g, (_, quote, file) => `from ${JSON.stringify(module(file.slice(2)))}`);
     const url = data(code); cache.set(name, url); return url;
   };
-  const css = ['styles.css', 'studio.css', 'studio-design.css', 'direct-canvas.css'].map(name => fs.readFileSync(path.join(ui, name), 'utf8')).join('\n');
+  const css = ['styles.css', 'studio.css', 'studio-design.css', 'direct-canvas.css', 'creation-shelf.css'].map(name => fs.readFileSync(path.join(ui, name), 'utf8')).join('\n');
   return fs.readFileSync(path.join(ui, 'index.html'), 'utf8').replace(/<link rel="stylesheet"[^>]*>/g, '').replace('</head>', `<style>${css}</style></head>`)
     .replace('<script type="module" src="/app.js"></script>', `<script src="${data(`(${setup.toString()})(${JSON.stringify(seed)})`)}"></script><script type="module" src="${module('app.js')}"></script>`);
 }
